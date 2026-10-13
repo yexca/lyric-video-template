@@ -1,0 +1,13 @@
+{
+  "title": "Untitled",
+  "slug": "song",
+  "port": 8600,
+  "current": "template",
+  "audio": "",
+  "lyrics": "",
+  "lrc_offset": 0,
+  "bpm_range": [70, 200],
+  "bar_offset": 0,
+  "export_dir": "data/export",
+  "tmp_dir": "data/tmp"
+}

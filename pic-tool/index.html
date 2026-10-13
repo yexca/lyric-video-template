@@ -1,0 +1,507 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title data-i18n>Image overview</title>
+<style>
+  :root { --bg: #12151b; --panel: #1b2029; --line: #333c4c; --ink: #eef0f4; --dim: #9aa4b5; --acc: #ffb454; --add: #58c98a; --del: #ef6a6a; --chg: #6fb0ff; }
+  * { box-sizing: border-box; }
+  html { scrollbar-gutter: stable; }
+  html.boxed { overflow: hidden; }
+  body { margin: 0; background: var(--bg); color: var(--ink); font: 14px/1.5 system-ui, "Microsoft YaHei", sans-serif; }
+  header { position: sticky; top: 0; z-index: 5; background: var(--bg); border-bottom: 1px solid var(--line); padding: 10px 18px; display: flex; flex-wrap: wrap; align-items: center; gap: 10px; }
+  h1 { font-size: 17px; margin: 0 8px 0 0; }
+  select, button, input { font: inherit; color: var(--ink); background: #242b36; border: 1px solid #485266; border-radius: 6px; padding: 6px 10px; }
+  button { cursor: pointer; }
+  nav { display: flex; gap: 4px; }
+  nav button[aria-pressed="true"] { background: var(--acc); border-color: var(--acc); color: #1a1205; font-weight: 700; }
+  .ctl { display: none; align-items: center; gap: 8px; }
+  .ctl.on { display: flex; }
+  #stat { color: var(--acc); margin-left: auto; }
+  #count { color: var(--dim); }
+  main { padding: 6px 18px 60px; }
+  h2 { font-size: 14px; color: var(--dim); font-weight: 600; margin: 22px 0 8px; border-bottom: 1px solid var(--line); padding-bottom: 4px; }
+  h2 b { color: var(--ink); font-size: 15px; margin-right: 6px; }
+  .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(var(--tile, 200px), 1fr)); gap: 12px; }
+  .tile { position: relative; background: var(--panel); border: 1px solid var(--line); border-radius: 8px; overflow: hidden; }
+  .tile img { display: block; width: 100%; aspect-ratio: 1; object-fit: contain; background: repeating-conic-gradient(#20252e 0 25%, #262c37 0 50%) 0 0 / 20px 20px; cursor: zoom-in; }
+  .tile .no { position: absolute; left: 6px; top: 6px; background: rgba(0, 0, 0, .78); color: var(--acc); font: 800 20px/1 system-ui; padding: 6px 9px; border-radius: 6px; cursor: copy; border: 0; }
+  .tile .no small { font-size: 12px; color: #fff; margin-left: 4px; font-weight: 600; }
+  .tile .cap { padding: 6px 9px; font-size: 12px; color: var(--dim); word-break: break-all; }
+  .tile .cap b { color: var(--ink); font-weight: 600; }
+  .tile .more, .head .more, h2 .more { background: rgba(0, 0, 0, .78); color: #fff; font-size: 12px; line-height: 1; padding: 6px 8px; border-radius: 6px; border: 0; }
+  .tile .more { position: absolute; right: 6px; top: 6px; }
+  .head .more, h2 .more { margin: 6px 0 0; background: #242b36; border: 1px solid #485266; }
+  h2 .more { margin: 0 0 0 10px; }
+  .more:hover { color: var(--acc); }
+  .tile.cur { border-color: var(--acc); box-shadow: 0 0 0 2px var(--acc); }
+  .times { display: inline-flex; flex-wrap: wrap; gap: 4px; align-items: center; vertical-align: middle; }
+  button.t { font: 600 12px/1 ui-monospace, Consolas, monospace; padding: 4px 6px; border-radius: 4px; color: var(--acc); background: #2a2417; border-color: #6b5326; }
+  button.t:hover { background: var(--acc); color: #1a1205; }
+  .acts { display: flex; flex-wrap: wrap; gap: 6px; padding: 0 9px 8px; }
+  .acts:empty { display: none; }
+  button.use { font-size: 12px; line-height: 1; padding: 6px 10px; color: var(--add); border-color: var(--add); background: transparent; }
+  button.use:hover { background: var(--add); color: #06210f; }
+  button.use:disabled { opacity: .4; cursor: progress; }
+  .dhead { display: flex; flex-wrap: wrap; align-items: baseline; gap: 12px; margin: 16px 0 0; }
+  .dhead b { font: 800 28px/1 system-ui; color: var(--acc); }
+  .dhead span { color: var(--dim); }
+  .tile.miss img { visibility: hidden; }
+  .tile.miss::after { content: var(--t-miss); position: absolute; inset: 0 0 40px; display: grid; place-items: center; color: var(--del); }
+  .tile.fail img { opacity: .12; cursor: pointer; }
+  .tile.fail::after { content: var(--t-fail); position: absolute; inset: 0 0 40px; display: grid; place-items: center; color: var(--del); pointer-events: none; }
+  .tag { display: inline-block; font-size: 11px; padding: 0 6px; border-radius: 4px; margin-right: 4px; border: 1px solid currentColor; }
+  .tag.add { color: var(--add); } .tag.del { color: var(--del); } .tag.chg { color: var(--chg); } .tag.use { color: var(--dim); }
+  .row { display: grid; grid-template-columns: 90px 1fr 1fr; gap: 12px; align-items: start; margin-bottom: 12px; padding-bottom: 12px; border-bottom: 1px solid var(--line); }
+  .row .head { font: 800 22px/1.2 system-ui; color: var(--acc); }
+  .row .head div { font: 12px/1.4 system-ui; color: var(--dim); word-break: break-all; margin-top: 4px; }
+  .row .none { aspect-ratio: 1; display: grid; place-items: center; color: var(--dim); border: 1px dashed var(--line); border-radius: 8px; }
+  .revs { display: flex; flex-wrap: wrap; gap: 12px; }
+  .revs .tile, .revs .none { width: var(--tile, 200px); }
+  .row.pick { grid-template-columns: 90px max-content 1fr; }
+  .revs.used { flex-wrap: nowrap; padding-right: 12px; border-right: 1px solid var(--line); }
+  .empty { color: var(--dim); padding: 40px 0; text-align: center; white-space: pre-line; }
+  .hint { color: var(--dim); font-size: 12px; margin: 10px 0 0; }
+  #box, #vid { position: fixed; inset: 0; z-index: 20; background: rgba(0, 0, 0, .93); display: none; grid-template-rows: auto 1fr; }
+  #vid { z-index: 25; background: #000; }
+  #box.on, #vid.on { display: grid; }
+  .bar { padding: 10px 16px; display: flex; gap: 14px; align-items: center; }
+  .bar b { color: var(--acc); font-size: 20px; }
+  .bar span, .bar a { color: var(--dim); }
+  .bar .acts { padding: 0; }
+  #box img { width: 100%; height: 100%; object-fit: contain; min-height: 0; }
+  #vid iframe { width: 100%; height: 100%; border: 0; min-height: 0; background: #000; }
+  .probe { position: fixed; left: -4000px; top: 0; width: 1920px; height: 1080px; border: 0; visibility: hidden; }
+  #toast { position: fixed; left: 50%; bottom: 28px; transform: translateX(-50%); background: #000; border: 1px solid var(--line); padding: 8px 16px; border-radius: 8px; opacity: 0; transition: opacity .2s; pointer-events: none; z-index: 30; display: flex; gap: 10px; align-items: center; }
+  #toast.on { opacity: 1; }
+  #toast.on.act { pointer-events: auto; }
+  #toast button { padding: 3px 10px; color: var(--acc); border-color: var(--acc); background: transparent; }
+</style>
+</head>
+<body>
+<header>
+  <h1 id="h1" data-i18n>Image overview</h1>
+  <nav>
+    <button data-view="version" aria-pressed="true" data-i18n>Images</button>
+    <button data-view="cand" aria-pressed="false" data-i18n>Candidates</button>
+    <button data-view="diff" aria-pressed="false" data-i18n>Compare versions</button>
+  </nav>
+  <span class="ctl" data-for="version cand one"><span data-i18n>Version</span> <select id="ver"></select></span>
+  <span class="ctl" data-for="version cand"><span data-i18n>Sort</span> <select id="sort"><option value="time" data-i18n>Order of appearance</option><option value="group" data-i18n>Group / number</option></select></span>
+  <span class="ctl" data-for="cand"><label><input type="checkbox" id="onlyNew"> <span data-i18n>Only new / changed</span></label></span>
+  <span class="ctl" data-for="diff"><select id="va"></select> → <select id="vb"></select> <label><input type="checkbox" id="onlyChg" checked> <span data-i18n>Only differences</span></label></span>
+  <input id="q" type="search" placeholder="Filter: number / key / group" data-i18n="placeholder" size="18">
+  <label><span data-i18n>Size</span> <input id="size" type="range" min="120" max="520" step="20" value="200"></label>
+  <span id="stat"></span>
+  <span id="count"></span>
+  <select data-i18n-lang aria-label="Language"></select>
+</header>
+<main id="main"></main>
+<div id="box"><div class="bar"><b id="boxNo"></b><span id="boxCap"></span><span class="acts" id="boxUse"></span><span style="margin-left:auto" data-i18n>←/→ previous / next · Esc close · click the number to copy it</span></div><img id="boxImg" alt=""></div>
+<div id="vid"><div class="bar"><b id="vidNo"></b><span data-i18n>Click the picture to play / pause · ←/→ 5 s back / forward</span><a id="vidOpen" target="_blank" rel="noopener" style="margin-left:auto" data-i18n>Open in a new tab ↗</a><button data-vidclose data-i18n>Close (Esc)</button></div><iframe id="vidFrame" title="Video" data-i18n="title" allow="autoplay; fullscreen"></iframe></div>
+<div id="toast"></div>
+<script src="../tools/i18n.js"></script>
+<script src="lang.zh-cn.js"></script>
+<script>
+'use strict';
+/* Image overview. Numbers, revisions and each version's images all come from pics.json and <version>/images.json (maintained by pic-tool/pic.py).
+ * When talking about images, just say "#37" (the number), "#37 r2" (revision 2) or "candidate hero/03" (data/candidates/hero/03.png). Clicking the number on an image copies that wording.
+ *
+ * "Version" is a filter: pick a version = only the images that version uses; pick "All versions" = everything in the image pool (every revision of every image / every candidate folder).
+ *   Images (pic-tool/): the images this version uses, ordered by when each first appears in the song (grouped by section); under each image are the times of all its appearances — click one to open this version's video here at that part.
+ *     All versions (pic-tool/#pool): one row per registered image, listing every revision and which versions use it.
+ *   Candidates (pic-tool/#cand): one row per image of this version — the revision in use (with the one the previous version used beside it, if it changed) + old revisions not in use + every candidate in data/candidates/<key>/.
+ *     With "Only new / changed" ticked (pic-tool/#pick) = only the images that are new or changed since the previous version, for verifying after a round of picking. All versions: every folder in data/candidates/.
+ *   Compare versions (pic-tool/#diff): two versions compared image by image.
+ * "Candidates N" at the top right of an image: opens that image's own page (pic-tool/#37) — all its revisions + all its candidates, marking which one the selected version uses and which candidate each revision came from.
+ *
+ * Appearance times are measured: the version's video page is opened in an invisible iframe, a frame is drawn every 0.1 s for the whole song, and the images actually drawn on screen in each frame are recorded (probe()).
+ *   The result is stored in data/derived/usage/<version>.json; after that version's storyboard files change, it is re-measured automatically the next time this page is opened (a few seconds).
+ * "Use this": makes the selected version use this revision / this candidate (a candidate is first added to the image pool as a new revision; data/img/ stays append-only as ever) — the same as pic.py use / pic.py add,
+ *   and what changes is <version>/images.json and pics.json. Reload the video page and the new image is there; after a swap, the toast at the bottom offers "Undo" and "Watch at …".
+ *   When the new image's aspect ratio or head position differs from the old one's, the parameters measured for the storyboard (head / fx / fy in assets.js) do not follow; change them separately.
+ * The tiles show thumbnails (/__thumb in tools/serve.py, stored in data/thumbs/); the original is loaded only when a tile is opened.
+ * All UI text is written in English (the English is the source string and also the dictionary lookup key); the Chinese is in lang.zh-cn.js (see tools/i18n.js for how it works). When you add or reword UI text, add or update the entry there too. */
+I18N.apply();
+for (const [k, s] of [['--t-miss', tr('File is not in data/img')], ['--t-fail', tr('Failed to load · click to retry')]]) document.documentElement.style.setProperty(k, JSON.stringify(s));
+const $ = s => document.querySelector(s);
+const IMG = 'data/img/', CAND = 'data/candidates/';      // relative to the workspace root
+const ALL = '*';                                          // "All versions"
+const esc = s => String(s).replace(/[&<>"]/g, ch => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[ch]));
+const get = async (url, fallback) => { try { const r = await fetch(url, { cache: 'no-store' }); return r.ok ? await r.json() : fallback; } catch { return fallback; } };
+const post = async (url, body) => { try { return await (await fetch(url, { method: 'POST', body: JSON.stringify(body) })).json(); } catch (e) { return { ok: false, msg: String(e) }; } };
+let proj, reg, pool = new Map(), cands = [], candBy = new Map(), man = {}, shown = [], boxAt = 0, depth = 0, TW = 0, later = false;
+const usage = {};                 // version → measured appearance times { keys: { key: [[start, end], …] }, sections: [[time, section name], …] }; null = not measured yet
+// What is being viewed now. All of it (scroll position included) is kept in the browser history: going back, "← Back" and reloading all return to the same page and position
+const S = { view: 'version', one: 0, ver: '', va: '', vb: '', onlyChg: true, onlyNew: false, sort: 'time', q: '' };
+
+// acts: [[button label, what clicking it does], …]. A toast with buttons stays up a little longer
+function toast(s, acts = []) {
+  const t = $('#toast'); t.textContent = s; toast.acts = acts;
+  acts.forEach(([label], i) => { const b = document.createElement('button'); b.textContent = label; b.dataset.act = i; t.append(b); });
+  t.classList.toggle('act', acts.length > 0); t.classList.add('on');
+  clearTimeout(toast.h); toast.h = setTimeout(() => t.classList.remove('on'), acts.length ? 9000 : 1400);
+}
+const stat = s => { $('#stat').textContent = s; };
+const urlOf = rel => '../' + rel.split('/').map(encodeURIComponent).join('/');
+// Thumbnails for the tiles: the width is the smallest of the sizes the server offers that is big enough; when the server makes no thumbnails (Pillow not installed) it is the original
+const thumbW = () => { const need = $('#size').value * 1.5 * devicePixelRatio; return proj.thumbs.find(w => w >= need) || proj.thumbs.at(-1) || 0; };
+const thumbOf = (rel, m) => TW ? `/__thumb?f=${encodeURIComponent(rel)}&w=${TW}&m=${m || 0}` : urlOf(rel);
+// The tile for one image. rel = path relative to the workspace, m = the file's modification time; label = the wording copied when the number badge is clicked.
+// o: small = small text on the number badge, cap = caption under the image, cls, badge = text shown on the number badge (by default the first part of label, e.g. "#37"), more = the button at the top right, use = the "Use this" buttons
+function tile(rel, m, label, { small = '', cap = '', cls = '', badge = label.split(' ')[0], more = '', use = '' } = {}) {
+  const i = shown.push({ rel, m, label, cap, use }) - 1;
+  return `<div class="tile ${cls}"><img loading="lazy" decoding="async" src="${esc(thumbOf(rel, m))}" data-i="${i}" alt="${esc(label)}">
+    <button class="no" data-copy="${esc(label)}" title="${esc(tr('Click to copy'))}">${esc(badge)}${small ? `<small>${esc(small)}</small>` : ''}</button>${more}<div class="cap">${cap}</div><div class="acts">${use}</div></div>`;
+}
+const poolTile = (file, label, o = {}) => tile(IMG + file, pool.get(file), label, { ...o, cls: (pool.has(file) ? '' : 'miss ') + (o.cls || '') });
+const candName = f => f.path.replace(/\.[^.]+$/, '');
+const candTile = (f, o = {}) => tile(CAND + f.path, f.mtime, tr('candidate {0}', candName(f)), { badge: candName(f).split('/').pop(), ...o });
+// The candidates of one image (by key) in data/candidates/<key>/; the "Candidates N" button = open that image's own page
+const candsOf = key => candBy.get(key) || [];
+const fromName = from => { const s = from.replace(/\.[^.\/]+$/, ''); return s.startsWith(CAND) ? tr('candidate {0}', s.slice(CAND.length)) : s; };      // how a revision's source (from in pics.json) is displayed
+const moreBtn = (no, text) => `<button class="more" data-one="${no}" title="${esc(tr('All revisions and candidates of this image'))}">${text || tr('Candidates {0}', candsOf(picOf(no).key).length)}</button>`;
+const picOf = no => reg.pics.find(p => p.no === no) || { no, key: '?', group: '', revs: [] };
+const match = (p, q) => !q || [`#${p.no}`, String(p.no), p.key, p.group || ''].some(s => s.toLowerCase().includes(q));
+const usedBy = (no, rev) => proj.all.filter(v => (man[v] || []).some(it => it.no === no && it.rev === rev));
+const itemTile = (it, { extra = '', cls = '', use = '' } = {}) => poolTile(it.file, `#${it.no} r${it.rev}`,
+  { small: it.rev > 1 ? 'r' + it.rev : '', cap: `<b>${esc(it.key)}</b>${it.as ? ' → ' + esc(it.as) : ''} ${extra}`, cls, more: moreBtn(it.no), use });
+const noItems = (v, q) => `<div class="empty">${q ? tr('{0} has no images registered yet (or nothing matches the filter).', v) : tr('{0} has no images registered yet.', v)}\npython pic-tool/pic.py add ${tr('&lt;image file&gt;')} --to ${v}</div>`;
+
+/* ---------- Appearance times ---------- */
+const clock = t => `${Math.floor(t / 60)}:${String(Math.floor(t % 60)).padStart(2, '0')}`;
+const nameOf = it => it.as || it.key;                    // the name the storyboard uses for this image
+// The spans [start, end] during which a name is on screen in this version (spans less than 1 s apart count as one appearance). null when not measured yet
+function spans(v, name) {
+  const u = usage[v], out = [];
+  if (!u) return null;
+  for (const [a, b] of u.keys[name] || []) { const last = out.at(-1); if (last && a - last[1] < 1) last[1] = b; else out.push([a, b]); }
+  return out;
+}
+const first = (v, name) => { const s = spans(v, name); return s && s.length ? s[0][0] : Infinity; };
+const peek = ([a, b]) => Math.min(a + .6, b);            // where to stop when showing this span: right when it appears the image is often still coming in, so go a little further
+// The row of times under an image: clicking one = open this version's video here, stopped at that part
+function times(v, it) {
+  const s = spans(v, nameOf(it));
+  if (!s) return '';
+  if (!s.length) return `<span class="tag del">${tr('Never on screen')}</span>`;
+  return `<span class="times">${s.length > 1 ? `<span class="tag chg">${tr('on screen {0}×', s.length)}</span>` : ''}${s.map(x =>
+    `<button class="t" data-t="${peek(x).toFixed(2)}" data-v="${esc(v)}" title="${tr('{0} – {1} · click to watch this part', clock(x[0]), clock(x[1]))}">${clock(x[0])}</button>`).join('')}</span>`;
+}
+// Sorted by first appearance and grouped by section: [[section heading, [item, …]], …], with the ones that never appear at the end. at(x) = when this item first appears
+function bySection(v, list, at) {
+  const secs = (usage[v].sections.length ? usage[v].sections : [[0, '']]).map(([t, name]) => ({ t, name, list: [] })), none = [];
+  for (const x of [...list].sort((a, b) => (at(a) - at(b)) || 0)) {
+    const t = at(x); let i = 0;
+    if (t === Infinity) { none.push(x); continue; }
+    while (i + 1 < secs.length && secs[i + 1].t <= t + .05) i++;
+    secs[i].list.push(x);
+  }
+  return [...secs.filter(s => s.list.length).map(s => [`<b>${esc(s.name)}</b>${tr('from {0}', clock(s.t))}`, s.list]), ...(none.length ? [[`<b>${tr('Never on screen')}</b>${tr('registered in this version, but never drawn anywhere in the song')}`, none]] : [])];
+}
+const timed = v => S.sort === 'time' && !!usage[v];
+const waitNote = v => S.sort === 'time' && !usage[v] ? `<div class="hint">${tr('Still measuring when each image appears; the list is re-sorted by order of appearance once that is done.')}</div>` : '';
+
+/* Measure when each image of a version appears: open the version's video page in an invisible iframe, draw a frame every STEP seconds for the whole song,
+ * and record the images actually drawn on screen in each frame (transparent ones and ones entirely off screen don't count). What is recorded is the name the storyboard uses (an alias counts as itself), so swapping an image needs no re-measuring. */
+const STEP = .1;
+async function probe(v, sig) {
+  const f = document.createElement('iframe'), loaded = new Promise((res, rej) => { f.onload = res; f.onerror = rej; });
+  f.className = 'probe'; f.src = `../${v}/index.html?export`;
+  stat(tr('{0}: loading the video page to measure when each image appears…', v));
+  document.body.append(f);
+  try {
+    await loaded;
+    const w = f.contentWindow;
+    await w.MV.ready;
+    const IMGS = w.eval('IMG'), owner = new Map(), seen = new Set(), P = w.CanvasRenderingContext2D.prototype, draw = P.drawImage;
+    for (const k in IMGS) for (const im of [IMGS[k].img, ...(IMGS[k].mips || [])]) if (im) owner.set(im, k);
+    if (typeof w.duotone === 'function') {                // a duotone image is drawn from another canvas: record which key it belongs to
+      const duo = w.duotone;
+      w.duotone = function (key) { const cv = duo.apply(this, arguments); if (cv) owner.set(cv, key); return cv; };
+    }
+    const onScreen = (g, a) => {                          // whether the place it is drawn at (the trailing arguments of drawImage), once transformed, intersects the canvas
+      const [x, y, dw, dh] = a.length >= 8 ? a.slice(4) : a, m = g.getTransform(), xs = [], ys = [];
+      if (dw == null) return true;
+      for (const [px, py] of [[x, y], [x + dw, y], [x, y + dh], [x + dw, y + dh]]) { xs.push(m.a * px + m.c * py + m.e); ys.push(m.b * px + m.d * py + m.f); }
+      return Math.max(...xs) > 0 && Math.max(...ys) > 0 && Math.min(...xs) < g.canvas.width && Math.min(...ys) < g.canvas.height;
+    };
+    P.drawImage = function (src, ...a) {
+      const k = owner.get(src);
+      if (k && !seen.has(k) && this.globalAlpha > .02 && onScreen(this, a)) seen.add(k);
+      return draw.call(this, src, ...a);
+    };
+    const D = w.MV.duration, n = Math.ceil(D / STEP), keys = {}, r2 = x => Math.round(x * 100) / 100;
+    let tick = performance.now();
+    for (let i = 0; i <= n; i++) {
+      const t = r2(Math.min(i * STEP, D - .01));
+      seen.clear(); w.MV.frame(t);
+      for (const k of seen) { const s = keys[k] || (keys[k] = []), last = s.at(-1); if (last && t - last[1] <= STEP * 1.5) last[1] = t; else s.push([t, t]); }
+      if (performance.now() - tick > 60) { stat(tr('{0}: measuring when each image appears, {1}%', v, Math.round(i / n * 100))); await new Promise(r => setTimeout(r)); tick = performance.now(); }
+    }
+    const data = { sig, step: STEP, duration: r2(D), sections: JSON.parse(JSON.stringify(w.MV.sections ? w.MV.sections() : [])), keys };
+    const changed = JSON.stringify((usage[v] || {}).keys) !== JSON.stringify(keys) || JSON.stringify((usage[v] || {}).sections) !== JSON.stringify(data.sections);
+    usage[v] = data;
+    post(`/__usage?v=${v}`, data);
+    if (changed && S.ver === v) redraw();
+  } finally { f.remove(); stat(''); }
+}
+let probing = Promise.resolve();                          // only one version is measured at a time
+// This version's appearance times: use the stored ones first; if there are none, or the storyboard has changed, measure (again)
+async function needUsage(v) {
+  if (v in usage) return;
+  usage[v] = null;
+  const r = await get(`/__usage?v=${v}`, null);
+  if (!r || !r.ok) return;
+  if (r.data) { usage[v] = r.data; if (S.ver === v) redraw(); }
+  if (!r.data || r.data.sig !== r.sig) probing = probing.then(() => probe(v, r.sig)).catch(e => { console.warn(`could not measure when the images of ${v} appear`, e); });
+}
+
+/* ---------- Use this ---------- */
+// The "Use this" buttons for a revision (rev = revision number) or a candidate (cand = path under data/candidates/): one for each use of this image in the selected version (main key + aliases).
+// The use that already has it gets no button
+function useBtns(v, p, { rev, cand }) {
+  if (v === ALL) return '';
+  const slots = (man[v] || []).filter(it => it.no === p.no);
+  const isCur = it => rev ? it.rev === rev : p.revs.some(r => r.rev === it.rev && r.from === CAND + cand);
+  return slots.filter(it => !isCur(it)).map(it => `<button class="use" data-use="${esc(JSON.stringify({ version: v, no: p.no, ...(rev ? { rev } : { cand }), ...(it.as ? { as: it.as } : {}) }))}" title="${tr('Make {0} use this one ({1})', esc(v), esc(nameOf(it)))}">${
+    slots.length > 1 ? tr('Use as {0}', esc(nameOf(it))) : tr('Use this')}</button>`).join('');
+}
+async function useIt(req, sure) {
+  const v = req.version, slot = it => it.no === req.no && (it.as || '') === (req.as || ''), was = (man[v] || []).find(slot);
+  if (!sure && v !== proj.current && !confirm(tr('{0} is not the current version ({1}).\nOld versions are normally left untouched — change its image anyway?', v, proj.current))) return;
+  document.querySelectorAll('button.use').forEach(b => (b.disabled = true));
+  const r = await post('/__pic_use', req);
+  if (r.ok) {
+    const [pics, inPool, list] = await Promise.all([get('../pics.json', reg), get('/__ls?dir=data/img', null), get(`../${v}/images.json`, man[v])]);
+    reg = pics; man[v] = list;
+    if (inPool) pool = new Map(inPool.files.map(f => [f.path, f.mtime]));
+  }
+  closeBox(); later = false; redraw();
+  if (!r.ok) return toast(tr('Not changed: {0}', r.msg || tr('no response from the server')), [[tr('OK'), () => {}]]);
+  const s = spans(v, req.as || picOf(req.no).key), back = { version: v, no: req.no, rev: was && was.rev, ...(req.as ? { as: req.as } : {}) };
+  toast(tr('{0}: {1} now uses r{2}', v, `#${req.no}` + (req.as ? tr(' ({0})', req.as) : ''), r.rev), [
+    ...(was && was.rev !== r.rev ? [[tr('Undo'), () => useIt(back, true)]] : []),
+    ...(s && s.length ? [[tr('Watch at {0}', clock(s[0][0])), () => openVideo(v, peek(s[0]))]] : [])]);
+}
+
+/* ---------- The views ---------- */
+function renderVersion(q) {
+  const v = S.ver, items = (man[v] || []).filter(it => match(picOf(it.no), q));
+  if (!items.length) return noItems(v, q);
+  let groups;
+  if (timed(v)) groups = bySection(v, items, it => first(v, nameOf(it)));
+  else { groups = new Map(); for (const it of items) { const g = esc(picOf(it.no).group || tr('Ungrouped')); groups.set(g, [...(groups.get(g) || []), it]); } groups = [...groups]; }
+  $('#count').textContent = tr('{0}: {1} image{1:|s}', v, items.length);
+  return waitNote(v) + groups.map(([g, list]) => `<h2>${g}${tr(' ({0})', list.length)}</h2><div class="grid">${list.map(it => itemTile(it, { extra: times(v, it) })).join('')}</div>`).join('');
+}
+// Candidates (a version selected): one row per image of this version. On the left, the revision this version uses (with the one the previous version used beside it, when they differ);
+// on the right, what it can be swapped for: old revisions not in use (those whose source file is no longer in the candidate folder) + all candidates for this key
+function renderPick(q) {
+  const v = S.ver, pv = proj.versions[proj.versions.indexOf(v) - 1] || '';
+  const of = (ver, no) => (man[ver] || []).filter(it => it.no === no), sig = list => list.map(it => it.file + '|' + (it.as || '')).sort().join();
+  const nos = [...new Set((man[v] || []).map(it => it.no))].filter(no => match(picOf(no), q));
+  if (!nos.length) return noItems(v, q);
+  const when = t => { const d = new Date(t * 1000), z = n => String(n).padStart(2, '0'); return `${z(d.getMonth() + 1)}-${z(d.getDate())} ${z(d.getHours())}:${z(d.getMinutes())}`; };
+  let n = 0, nc = 0;
+  const row = no => {
+    const p = picOf(no), now = of(v, no), was = pv ? of(pv, no) : [], changed = pv && sig(now) !== sig(was);
+    if (pv && !changed && S.onlyNew) return '';
+    const list = candsOf(p.key), gone = was.filter(x => !now.some(y => y.file === x.file)), has = (items, r) => items.some(it => it.rev === r.rev);
+    const tag = !changed ? '' : !was.length ? `<span class="tag add">${tr('new')}</span>` : `<span class="tag chg">${tr('changed')}</span>`;
+    const used = gone.map(it => itemTile(it, { extra: `<span class="tag del">${tr('used in {0}', esc(pv))}</span>`, use: useBtns(v, p, { rev: it.rev }) })).join('')
+      + now.map(it => itemTile(it, { extra: `<span class="tag add">${tr('in use in {0}', esc(v))}</span> ${times(v, it)}`, cls: 'cur' })).join('');
+    const old = p.revs.filter(r => !has(now, r) && !has(gone, r) && !list.some(f => r.from === CAND + f.path)).map(r => poolTile(r.file, `#${no} r${r.rev}`,
+      { small: 'r' + r.rev, cap: `${tr('old revision {0}', esc(r.added || ''))}${r.note ? '<br>' + esc(r.note) : ''}`, use: useBtns(v, p, { rev: r.rev }) })).join('');
+    const cs = list.map(f => {
+      const revs = p.revs.filter(r => r.from === CAND + f.path);
+      return candTile(f, { cap: `${esc(f.path)} · ${when(f.mtime)}<br>` + revs.map(r => `<span class="tag chg">${tr('added as r{0}', r.rev)}</span>` + (has(now, r) ? `<span class="tag add">${tr('in use in {0}', esc(v))}</span>` : has(gone, r) ? `<span class="tag del">${tr('used in {0}', esc(pv))}</span>` : '')).join(''),
+        cls: revs.some(r => has(now, r)) ? 'cur' : '', use: useBtns(v, p, { cand: f.path }) });
+    }).join('');
+    n++; nc += list.length;
+    return `<div class="row pick"><div class="head">#${no}<div>${esc(p.key)}<br>${tag}</div>${moreBtn(no, tr('All revisions'))}</div><div class="revs used">${used}</div><div class="revs">${(old + cs) || `<div class="none">${tr('No images in {0}', `data/candidates/${esc(p.key)}/`)}</div>`}</div></div>`;
+  };
+  const rows = timed(v) ? bySection(v, nos, no => Math.min(...of(v, no).map(it => first(v, nameOf(it))))).map(([g, list]) => { const r = list.map(row).join(''); return r && `<h2>${g}</h2>${r}`; }).join('') : nos.map(row).join('');
+  $('#count').textContent = `${tr('{0}: {1} image{1:|s}', v, n)}${pv && S.onlyNew ? tr(' (new / changed since {0})', pv) : ''} · ${tr('{0} candidate{0:|s}', nc)}`;
+  return rows ? waitNote(v) + rows : `<div class="empty">${q ? tr('{0} and {1} use exactly the same images (or nothing matches the filter).', v, pv) : tr('{0} and {1} use exactly the same images.', v, pv)}\n${tr('Untick “Only new / changed” to see all of them.')}</div>`;
+}
+function renderDiff(q) {
+  const a = S.va, b = S.vb, main = v => (man[v] || []).filter(it => !it.as).map(it => [it.no, it]), A = new Map(main(a)), B = new Map(main(b));      // aliases (another revision of the same image) are left out of the comparison
+  const nos = [...new Set([...A.keys(), ...B.keys()])].sort((x, y) => x - y).filter(no => match(picOf(no), q));
+  let n = 0;
+  const rows = nos.map(no => {
+    const x = A.get(no), y = B.get(no), same = x && y && x.file === y.file;
+    if (same && S.onlyChg) return '';
+    if (!same) n++;
+    const tag = same ? '' : !x ? `<span class="tag add">${tr('new')}</span>` : !y ? `<span class="tag del">${tr('no longer used')}</span>` : `<span class="tag chg">${tr('changed')}</span>`;
+    const side = (it, v) => it ? itemTile(it, { extra: `<span class="tag use">${v}</span>` }) : `<div class="none">${tr('not in {0}', v)}</div>`;
+    return `<div class="row"><div class="head">#${no}<div>${esc(picOf(no).key)}<br>${tag}</div>${moreBtn(no)}</div>${side(x, a)}${side(y, b)}</div>`;
+  }).join('');
+  $('#count').textContent = tr('{0} → {1}: {2} difference{2:|s}', a, b, n);
+  return rows || `<div class="empty">${tr('{0} and {1} use exactly the same images', a, b)}</div>`;
+}
+// Images (All versions): one row per registered image, with all its revisions
+function renderPool(q) {
+  const pics = reg.pics.filter(p => match(p, q)), known = new Set(reg.pics.flatMap(p => p.revs.map(r => r.file)));
+  const stray = [...pool.keys()].filter(f => !known.has(f));
+  $('#count').textContent = tr('{0} registered · {1} file{1:|s} in the pool', reg.pics.length, pool.size);
+  const rows = pics.map(p => `<div class="row" style="grid-template-columns:90px 1fr"><div class="head">#${p.no}<div>${esc(p.key)}<br>${esc(p.group || '')}</div>${moreBtn(p.no)}</div><div class="revs">${
+    p.revs.map(r => { const u = usedBy(p.no, r.rev); return poolTile(r.file, `#${p.no} r${r.rev}`, { small: 'r' + r.rev,
+      cap: `${esc(r.added || '')} ${u.map(v => `<span class="tag use">${v}</span>`).join('') || `<span class="tag del">${tr('not used by any version')}</span>`}${r.note ? '<br>' + esc(r.note) : ''}` }); }).join('')
+  }</div></div>`).join('');
+  const extra = stray.length && !q ? `<h2>${tr('Unregistered files in the pool ({0}) — register them with pic.py add, or move them to data/candidates/', stray.length)}</h2><div class="grid">${stray.map(f => poolTile(f, f, { cap: esc(f), badge: tr('unregistered') })).join('')}</div>` : '';
+  return (rows + extra) || `<div class="empty">${tr('The image pool is still empty.')}\npython pic-tool/pic.py add ${tr('&lt;image file&gt;')}</div>`;
+}
+// Candidates (All versions): every folder in data/candidates/
+function renderCand(q) {
+  const list = cands.filter(f => !q || f.path.toLowerCase().includes(q));
+  if (!list.length) return `<div class="empty">${tr('No images in data/candidates/.\nCandidates go in one folder per key: data/candidates/&lt;key&gt;/01.png …')}</div>`;
+  const groups = new Map();
+  for (const f of list) { const g = f.path.includes('/') ? f.path.slice(0, f.path.lastIndexOf('/')) : tr('(root folder)'); groups.set(g, [...(groups.get(g) || []), f]); }
+  $('#count').textContent = tr('{0} candidate{0:|s}', list.length);
+  const noOf = g => (reg.pics.find(p => p.key === g) || {}).no;
+  return [...groups].map(([g, fs]) => `<h2>${esc(g)}${tr(' ({0})', fs.length)}${noOf(g) ? moreBtn(noOf(g), tr('Revisions and candidates of #{0}', noOf(g))) : ''}</h2><div class="grid">${fs.map(f => candTile(f, { cap: esc(f.path) })).join('')}</div>`).join('');
+}
+// An image's own page: all revisions + all candidates. The revision the selected version uses (and the candidate it came from) is highlighted; any other can be swapped in with "Use this"
+function renderOne() {
+  const p = picOf(S.one), v = S.ver, used = v === ALL ? [] : (man[v] || []).filter(it => it.no === p.no), list = candsOf(p.key);
+  const useTag = r => used.filter(it => it.rev === r.rev).map(it => `<span class="tag add">${tr('in use in {0}', esc(v))}${it.as ? tr(' (alias {0})', esc(it.as)) : ''}</span>`).join('');
+  const others = r => usedBy(p.no, r.rev).filter(x => x !== v).map(x => `<span class="tag use">${esc(x)}</span>`).join('');
+  const revOf = f => p.revs.filter(r => r.from === CAND + f.path);
+  $('#count').textContent = tr('#{0}: {1} revision{1:|s} · {2} candidate{2:|s}', p.no, p.revs.length, list.length);
+  const head = `<div class="dhead"><button data-back>${tr('← Back')}</button><b>#${p.no}</b><span>${esc(p.key)}${p.group ? ' · ' + esc(p.group) : ''}</span>${v === ALL ? `<span>${tr('Pick a version to see which revision it uses and when it appears in the song')}</span>`
+    : used.length ? used.map(it => `<span>${tr('{0} uses r{1}', esc(v), it.rev)}${it.as ? tr(' ({0})', esc(it.as)) : ''} ${times(v, it)}</span>`).join('') : `<span>${tr('{0} does not use this image', esc(v))}</span>`}</div>`;
+  const revs = p.revs.map(r => poolTile(r.file, `#${p.no} r${r.rev}`, { small: 'r' + r.rev,
+    cap: `${esc(r.added || '')} ${useTag(r)}${others(r)}${r.from ? '<br>' + tr('source: {0}', esc(fromName(r.from))) : ''}${r.note ? '<br>' + esc(r.note) : ''}`,
+    cls: useTag(r) ? 'cur' : '', use: useBtns(v, p, { rev: r.rev }) })).join('');
+  const cs = list.map(f => { const rs = revOf(f);
+    return candTile(f, { cap: esc(f.path) + ' ' + rs.map(r => `<span class="tag chg">${tr('added as r{0}', r.rev)}</span>`).join('') + rs.map(useTag).join(''), cls: rs.some(r => useTag(r)) ? 'cur' : '', use: useBtns(v, p, { cand: f.path }) }); }).join('');
+  return head + `<h2>${tr('Revisions ({0})', p.revs.length)}</h2><div class="grid">${revs || `<div class="empty">${tr('This number is not registered')}</div>`}</div>`
+    + `<h2>${tr('Candidates in {0} ({1})', `data/candidates/${esc(p.key)}/`, list.length)}</h2>` + (cs ? `<div class="grid">${cs}</div>` : `<div class="empty">${tr('No images in {0}.', `data/candidates/${esc(p.key)}/`)}</div>`);
+}
+const RENDER = { version: q => S.ver === ALL ? renderPool(q) : renderVersion(q), cand: q => S.ver === ALL ? renderCand(q) : renderPick(q), diff: renderDiff, one: renderOne };
+function render() {
+  shown = []; TW = thumbW(); $('#count').textContent = '';
+  $('#sort').disabled = S.ver === ALL;                    // All versions: there is no "Order of appearance"; sorted by number / folder
+  if (S.view !== 'diff' && S.ver !== ALL) needUsage(S.ver);
+  $('#main').innerHTML = RENDER[S.view](S.q.trim().toLowerCase());
+}
+// The data changed (appearance times measured, an image swapped): redraw in place, keeping the scroll position. While the large image is open, wait until it is closed (otherwise the ←/→ order would change)
+function redraw() {
+  if (!reg) return;
+  if ($('#box').classList.contains('on')) { later = true; return; }
+  const y = scrollY; render(); scrollTo(0, y);
+}
+// Set the controls from S, render, and scroll to y. Tile heights don't wait for the images to load (fixed aspect ratio), so the scroll lands right after rendering
+function show(y) {
+  for (const id of ['ver', 'va', 'vb', 'q', 'sort']) $('#' + id).value = S[id];
+  for (const id of ['onlyChg', 'onlyNew']) $('#' + id).checked = S[id];
+  document.querySelectorAll('nav button').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.view === S.view)));
+  document.querySelectorAll('.ctl').forEach(el => el.classList.toggle('on', el.dataset.for.split(' ').includes(S.view)));
+  render(); scrollTo(0, y);
+}
+const hashOf = () => S.view === 'one' ? '#' + S.one : S.view === 'diff' ? '#diff' : S.view === 'cand' ? (S.onlyNew && S.ver !== ALL ? '#pick' : '#cand') : S.ver === ALL ? '#pool' : '';
+const here = () => location.pathname + location.search + hashOf();
+const snap = (y = Math.round(scrollY)) => ({ ...S, y, depth });
+const keep = () => { if (reg) history.replaceState(snap(), '', here()); };       // record the current state (scroll position included) in the current history entry
+const load = st => { for (const k in S) if (k in st) S[k] = st[k]; depth = st.depth || 0; };
+// Changing view: record the current position first, then push a new history entry. The browser's back button and "← Back" then return here
+function go(patch) { keep(); Object.assign(S, patch); depth++; history.pushState(snap(0), '', here()); show(0); }
+// The # in the address bar: #37 = the page of image #37; #cand = Candidates, #pick = Candidates with only new / changed, #pool = images of all versions, #diff = Compare versions
+function fromHash() {
+  const h = decodeURIComponent(location.hash.slice(1)), cur = S.ver === ALL ? proj.current : S.ver;
+  if (+h && reg.pics.some(p => p.no === +h)) return { view: 'one', one: +h };
+  return h === 'pick' ? { view: 'cand', onlyNew: true, ver: cur } : h === 'cand' ? { view: 'cand', onlyNew: false } : h === 'pool' ? { view: 'version', ver: ALL } : { view: h === 'diff' ? 'diff' : 'version' };
+}
+const lock = () => document.documentElement.classList.toggle('boxed', $('#box').classList.contains('on') || $('#vid').classList.contains('on'));     // while the large image / video is open, the page behind doesn't scroll
+function openBox(i) {
+  boxAt = (i + shown.length) % shown.length; const s = shown[boxAt], img = $('#boxImg'), full = urlOf(s.rel), big = new Image();
+  img.src = thumbOf(s.rel, s.m);                     // thumbnail first, replaced by the original once it has loaded
+  big.onload = () => { if (shown[boxAt] === s && $('#box').classList.contains('on')) img.src = full; }; big.src = full;
+  $('#boxNo').textContent = s.label; $('#boxNo').dataset.copy = s.label; $('#boxCap').innerHTML = s.cap; $('#boxUse').innerHTML = s.use;
+  $('#box').classList.add('on'); lock();
+}
+function closeBox() { $('#box').classList.remove('on'); lock(); if (later) { later = false; redraw(); } }
+// Open a version's video here, stopped at t seconds (the page is freshly loaded, so an image that was just swapped is already the new one)
+function openVideo(v, t) {
+  const url = `../${v}/index.html?t=${(+t).toFixed(2)}`;
+  $('#vidNo').textContent = `${v} · ${clock(t)}`; $('#vidOpen').href = url; $('#vidFrame').src = url;
+  $('#vid').classList.add('on'); lock();
+}
+function closeVideo() { $('#vid').classList.remove('on'); $('#vidFrame').src = 'about:blank'; lock(); }
+$('#vidFrame').onload = e => { try { e.target.contentWindow.addEventListener('keydown', k => { if (k.key === 'Escape') closeVideo(); }); e.target.contentWindow.focus(); } catch {} };
+// An image failed to load: retry automatically after a while (the thumbnail twice, the original once); if it still fails, mark the tile, and a click retries
+function retry(img, manual) {
+  const s = shown[+img.dataset.i], n = manual ? 0 : (+img.dataset.try || 0) + 1, box = img.closest('.tile');
+  img.dataset.try = n; box.classList.toggle('fail', n > 3);
+  if (n > 3 || !s) return;
+  const src = n < 3 ? thumbOf(s.rel, s.m) : urlOf(s.rel);
+  setTimeout(() => { if (img.isConnected) img.src = `${src}${src.includes('?') ? '&' : '?'}try=${n}.${Date.now() % 1e6}`; }, 400 * n * n);
+}
+document.addEventListener('error', e => { if (e.target.matches?.('.tile:not(.miss) img')) retry(e.target); }, true);
+document.addEventListener('click', e => {
+  const on = sel => e.target.closest(sel);
+  const act = on('[data-act]');
+  if (act) { $('#toast').classList.remove('on'); return toast.acts[+act.dataset.act][1](); }
+  const copy = on('[data-copy]');
+  if (copy) { navigator.clipboard?.writeText(copy.dataset.copy).then(() => toast(tr('Copied “{0}”', copy.dataset.copy)), () => toast(copy.dataset.copy)); return; }
+  if (on('[data-use]')) return useIt(JSON.parse(on('[data-use]').dataset.use));
+  if (on('[data-t]')) return openVideo(on('[data-t]').dataset.v, +on('[data-t]').dataset.t);
+  if (on('[data-vidclose]')) return closeVideo();
+  if (on('#vid')) return;
+  const more = on('[data-one]');
+  if (more) return go({ view: 'one', one: +more.dataset.one });
+  if (on('[data-back]')) return depth > 0 ? history.back() : (Object.assign(S, { view: 'version' }), show(0), keep());
+  if (e.target.matches('.tile.fail img')) return retry(e.target, true);
+  if (e.target.matches('.tile img')) return openBox(+e.target.dataset.i);
+  if (on('#box')) closeBox();
+});
+addEventListener('keydown', e => {
+  if ($('#vid').classList.contains('on')) { if (e.key === 'Escape') closeVideo(); return; }
+  if (!$('#box').classList.contains('on')) return;
+  if (e.key === 'Escape') closeBox();
+  else if (e.key === 'ArrowRight') openBox(boxAt + 1);
+  else if (e.key === 'ArrowLeft') openBox(boxAt - 1);
+});
+document.querySelectorAll('nav button').forEach(b => (b.onclick = () => { if (reg && b.dataset.view !== S.view) go({ view: b.dataset.view }); }));
+for (const id of ['ver', 'va', 'vb', 'sort', 'onlyChg', 'onlyNew']) $('#' + id).onchange = e => { S[id] = e.target.type === 'checkbox' ? e.target.checked : e.target.value; render(); keep(); };
+$('#q').oninput = e => { S.q = e.target.value; render(); keep(); };
+const setSize = () => document.documentElement.style.setProperty('--tile', $('#size').value + 'px');
+$('#size').oninput = setSize;
+$('#size').onchange = () => { try { localStorage.setItem('pic-tool.size', $('#size').value); } catch {} if (reg && thumbW() !== TW) render(); };
+try { $('#size').value = localStorage.getItem('pic-tool.size') || 200; } catch {}
+setSize();
+
+history.scrollRestoration = 'manual';
+let scrollTimer = 0;
+addEventListener('scroll', () => { clearTimeout(scrollTimer); scrollTimer = setTimeout(keep, 300); }, { passive: true });
+addEventListener('beforeunload', keep);                 // record once more before reloading or leaving (changes made to the history in pagehide don't stick)
+addEventListener('popstate', e => { if (reg && e.state) { load(e.state); closeBox(); closeVideo(); show(e.state.y || 0); } });
+addEventListener('hashchange', () => { if (reg && !history.state) { Object.assign(S, fromHash()); depth++; show(0); keep(); } });      // the # in the address bar edited by hand
+
+(async () => {
+  proj = await get('/__project', null);
+  if (!proj) { $('#main').innerHTML = `<div class="empty">${tr('Can\'t read the project info: run python tools/serve.py, then open http://127.0.0.1:8600/pic-tool/')}</div>`; return; }
+  proj.all = [...proj.versions, 'template'];
+  $('#h1').textContent = `${proj.title} · ${tr('Image overview')}`; document.title = `${tr('Image overview')} · ${proj.title}`;
+  const [pics, inPool, inCand] = await Promise.all([get('../pics.json', { next: 1, pics: [] }), get('/__ls?dir=data/img', { files: [] }), get('/__ls?dir=data/candidates', { files: [] }),
+    ...proj.all.map(async v => { man[v] = await get(`../${v}/images.json`, []); })]);
+  pool = new Map((inPool.files || []).map(f => [f.path, f.mtime])); cands = inCand.files || [];
+  for (const f of cands) { const key = f.path.split('/')[0]; candBy.set(key, [...(candBy.get(key) || []), f]); }
+  const opts = proj.all.map(v => `<option>${v}</option>`).join('');
+  for (const id of ['va', 'vb']) $('#' + id).innerHTML = opts;
+  $('#ver').innerHTML = `<option value="${ALL}">${tr('All versions')}</option>` + opts;
+  const cur = proj.all.includes(proj.current) ? proj.current : proj.all[0], i = proj.versions.indexOf(cur), st = history.state;
+  proj.current = cur;
+  Object.assign(S, { ver: cur, vb: cur, va: i > 0 ? proj.versions[i - 1] : cur });
+  reg = pics;
+  if (st && RENDER[st.view]) load(st); else Object.assign(S, fromHash());      // reloading, or coming back from another page: return to the same page and position; otherwise go by the # in the address bar
+  if (![ALL, ...proj.all].includes(S.ver)) S.ver = cur;
+  for (const id of ['va', 'vb']) if (!proj.all.includes(S[id])) S[id] = cur;
+  if (S.view === 'one' && !reg.pics.some(p => p.no === S.one)) S.view = 'version';
+  show(st ? st.y || 0 : 0); keep();
+})();
+</script>
+</body>
+</html>

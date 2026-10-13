@@ -1,0 +1,998 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title data-i18n>Lyric timing</title>
+<style>
+:root {
+  --bg: #15141c; --panel: #1f1d29; --panel2: #292636; --line: #3a3650; --ink: #f1edf7; --dim: #9a94ad;
+  --acc: #ff7aa8; --ok: #5fd39a; --warn: #ffb648; --blue: #6cb8ff; --mono: "Cascadia Mono", Consolas, monospace;
+  --jp: "Yu Gothic UI", "Meiryo", "Hiragino Sans", sans-serif;
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; height: 100%; overflow: hidden; background: var(--bg); color: var(--ink); font: 14px/1.45 var(--jp); }
+button { font: inherit; color: var(--ink); background: var(--panel2); border: 1px solid var(--line); border-radius: 8px; padding: 6px 12px; cursor: pointer; }
+button:hover { border-color: var(--acc); }
+select { font: inherit; color: var(--ink); background: var(--panel2); border: 1px solid var(--line); border-radius: 8px; padding: 6px 8px; }
+button.on { background: #4a2740; border-color: var(--acc); }
+#app { display: grid; grid-template-columns: 300px 1fr; height: 100%; }
+#side { background: var(--panel); border-right: 1px solid var(--line); overflow: auto; }
+#side h1 { font-size: 15px; margin: 14px 14px 4px; }
+#prog { margin: 0 14px 10px; color: var(--dim); font-size: 12px; }
+#prog .bar { height: 5px; background: var(--panel2); border-radius: 3px; margin-top: 6px; overflow: hidden; }
+#prog .bar i { display: block; height: 100%; background: var(--ok); }
+.li { display: grid; grid-template-columns: 28px 1fr; gap: 6px; padding: 7px 12px; border-left: 3px solid transparent; cursor: pointer; }
+.li:hover { background: var(--panel2); }
+.li.cur { background: #2f2a40; border-left-color: var(--acc); }
+.li .n { color: var(--dim); font: 12px var(--mono); padding-top: 2px; }
+.li .t { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.li .s { font-size: 11px; color: var(--dim); }
+.li .s.ok { color: var(--ok); }
+.li .s.q { color: var(--warn); }
+#main { display: flex; flex-direction: column; min-width: 0; height: 100%; overflow: auto; }
+#top { position: sticky; top: 0; z-index: 2; }
+#top { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; padding: 10px 16px; border-bottom: 1px solid var(--line); background: var(--panel); }
+#top .grow { flex: 1; }
+#saved { font-size: 12px; color: var(--dim); }
+#saved.dirty { color: var(--warn); }
+#title { padding: 14px 18px 4px; font-size: 26px; font-weight: 700; letter-spacing: .04em; }
+#title small { font-size: 13px; font-weight: 400; color: var(--dim); margin-left: 10px; letter-spacing: 0; }
+#sub { padding: 0 18px 8px; color: var(--dim); font-size: 12px; }
+#morae { display: flex; flex-wrap: wrap; gap: 6px; padding: 6px 16px 12px; }
+.m { position: relative; min-width: 58px; padding: 6px 6px 5px; border: 1px solid var(--line); border-radius: 9px; background: var(--panel); text-align: center; cursor: pointer; user-select: none; }
+.m .d { font-size: 22px; height: 30px; line-height: 30px; }
+.m .k { font-size: 13px; color: var(--dim); }
+.m .tm { font: 11px var(--mono); color: var(--dim); margin-top: 2px; }
+.m.ph { margin-left: 14px; }
+.m.ph::before { content: '/'; position: absolute; left: -12px; top: 18px; color: var(--acc); font-weight: 700; }
+.m.cur { border-color: var(--acc); background: #3a2336; box-shadow: 0 0 0 2px rgba(255,122,168,.35); }
+.m.done .tm { color: var(--ink); }
+.m.tied { border-style: dashed; }
+.m.tied .tm { color: var(--blue); }
+.m.unc::after { content: '?'; position: absolute; right: 5px; top: 2px; color: var(--warn); font-weight: 700; }
+.m.play { background: #23344a; }
+.m.end { min-width: 70px; }
+.m.end .d { font-size: 15px; color: var(--dim); }
+#wavebox { position: relative; flex-shrink: 0; margin: 0 16px; border: 1px solid var(--line); border-radius: 10px; overflow: hidden; background: #100f16; }
+#wave { display: block; width: 100%; height: 260px; cursor: crosshair; }
+#wave.panning, #scroll.panning { cursor: grabbing; }
+#scroll { display: block; width: 100%; height: 34px; cursor: grab; border-top: 1px solid var(--line); }
+#help { padding: 10px 18px 16px; color: var(--dim); font-size: 12px; line-height: 1.9; }
+#help kbd { font: 11px var(--mono); background: var(--panel2); border: 1px solid var(--line); border-bottom-width: 2px; border-radius: 4px; padding: 0 5px; color: var(--ink); }
+#toast { position: fixed; right: 16px; bottom: 16px; max-width: 520px; background: var(--panel2); border: 1px solid var(--line); border-radius: 10px; padding: 10px 14px; white-space: pre-wrap; font-size: 12px; opacity: 0; transition: opacity .25s; pointer-events: none; }
+#toast.show { opacity: 1; }
+#draft { display: none; margin: 10px 16px 0; padding: 10px 14px; border: 1px solid var(--warn); border-radius: 10px; background: #3a2e17; }
+#draft.show { display: flex; gap: 10px; align-items: center; }
+#calib { display: none; position: fixed; inset: 0; background: rgba(10,8,16,.86); align-items: center; justify-content: center; z-index: 9; }
+#calib.show { display: flex; }
+#calib .box { background: var(--panel); border: 1px solid var(--line); border-radius: 14px; padding: 22px 26px; max-width: 520px; line-height: 1.8; }
+#calib .big { font-size: 40px; text-align: center; margin: 10px 0; font-family: var(--mono); }
+#shiftbar { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; padding: 8px 16px; border-bottom: 1px solid var(--line); background: var(--panel); font-size: 13px; }
+#shiftbar input { width: 76px; font: 13px var(--mono); color: var(--ink); background: var(--bg); border: 1px solid var(--line); border-radius: 6px; padding: 5px 7px; }
+#shiftbar .sep { width: 1px; height: 20px; background: var(--line); margin: 0 4px; }
+#shiftbar .hint { color: var(--dim); font-size: 12px; }
+#title ruby { ruby-position: over; }
+#title rt { font-size: 12px; font-weight: 400; color: var(--dim); letter-spacing: 0; }
+#linebar { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; padding: 8px 16px; border-bottom: 1px solid var(--line); background: var(--panel); font-size: 13px; }
+#linebar .sep { width: 1px; height: 20px; background: var(--line); margin: 0 4px; }
+#linebar .hint { color: var(--dim); font-size: 12px; }
+#linebar button.danger:hover { border-color: #ff6b6b; color: #ff9a9a; }
+.li .o { color: var(--warn); font: 10px var(--mono); }
+#editor { display: none; position: fixed; inset: 0; background: rgba(10,8,16,.86); align-items: center; justify-content: center; z-index: 9; }
+#editor.show { display: flex; }
+#editor .box { background: var(--panel); border: 1px solid var(--line); border-radius: 14px; padding: 20px 24px; width: min(1100px, 94vw); max-height: 92vh; overflow: auto; }
+#editor h2 { margin: 0 0 4px; font-size: 16px; }
+#editor .lab { color: var(--dim); font-size: 12px; margin: 14px 0 6px; }
+#edPrev { min-height: 74px; padding: 14px 16px 8px; border-radius: 10px; background: #100f16; font-size: 30px; font-weight: 700; letter-spacing: .04em; line-height: 2; }
+#edPrev rt { font-size: 13px; font-weight: 400; color: var(--acc); letter-spacing: 0; }
+#edPrev .br { color: var(--acc); margin: 0 .35em; font-weight: 400; }
+#edPrev .miss { color: var(--warn); }
+#edText { width: 100%; font: 22px var(--jp); color: var(--ink); background: var(--bg); border: 1px solid var(--line); border-radius: 8px; padding: 9px 12px; }
+#edText:focus, .cell input:focus { outline: none; border-color: var(--acc); }
+#edCells { display: flex; flex-wrap: wrap; gap: 6px 4px; align-items: flex-end; }
+.cell { display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 6px 5px 5px; border: 1px solid var(--line); border-radius: 9px; background: var(--panel2); }
+.cell.kana { background: none; border-color: transparent; padding: 6px 1px 5px; }
+.cell .ch { font-size: 24px; height: 32px; line-height: 32px; }
+.cell input { width: 3.2em; text-align: center; font: 14px var(--jp); color: var(--ink); background: var(--bg); border: 1px solid var(--line); border-radius: 6px; padding: 3px 2px; }
+.cell.kana input { width: 2em; color: var(--dim); border-color: transparent; background: none; }
+.cell.kana input:hover, .cell.kana input:focus { border-color: var(--line); background: var(--bg); color: var(--ink); }
+.cell.bad input { border-color: var(--warn); }
+.cell.guess input { color: var(--blue); }
+.cell .ops { display: flex; gap: 3px; height: 18px; }
+.cell .ops button { font-size: 10px; padding: 0 5px; border-radius: 5px; line-height: 16px; color: var(--dim); }
+.cell.pu { border: none; background: none; color: var(--dim); padding: 6px 0 30px; }
+.cell.gap { border: none; background: none; color: var(--acc); font-weight: 700; padding: 6px 6px 30px; }
+#edInfo { margin-top: 12px; color: var(--dim); font-size: 12px; line-height: 1.7; white-space: pre-wrap; }
+#edInfo b { color: var(--ink); font-weight: 400; }
+#edInfo .w { color: var(--warn); }
+#editor .btns { display: flex; gap: 10px; justify-content: flex-end; margin-top: 14px; align-items: center; }
+#editor .btns .hint { color: var(--dim); font-size: 12px; margin-right: auto; }
+#edApply:disabled { opacity: .45; cursor: not-allowed; }
+</style>
+</head>
+<body>
+<div id="app">
+  <aside id="side">
+    <h1 id="h1" data-i18n>Mora timing</h1>
+    <div id="prog"></div>
+    <div id="list"></div>
+  </aside>
+  <main id="main">
+    <div id="top">
+      <button id="bPlay" title="Space" data-i18n>▶ Play / pause</button>
+      <button id="bLine" title="R" data-i18n>⟲ Replay line</button>
+      <span data-i18n>Speed</span>
+      <button data-rate="0.5">0.5×</button><button data-rate="0.6">0.6×</button><button data-rate="0.75">0.75×</button><button data-rate="1">1×</button>
+      <button id="bSrc" title="V" data-i18n>Vocals</button>
+      <button id="bCal" data-i18n>Latency calibration</button>
+      <span class="grow"></span>
+      <span id="saved" data-i18n>Saved</span>
+      <button id="bOk" title="Enter" data-i18n>✓ Confirm line</button>
+      <button id="bSave" title="Ctrl+S" data-i18n>Save to project</button>
+      <button id="bPrev" title="P" data-i18n>View in the video</button>
+      <select data-i18n-lang aria-label="Language"></select>
+    </div>
+    <div id="shiftbar">
+      <span data-i18n>Shift</span><input id="shiftVal" type="number" step="0.01" min="0" value="0.05" title="Seconds to shift by (positive)" data-i18n="title"><span data-i18n>s</span>
+      <button id="bLineEarly" title="[" data-i18n>Line earlier</button><button id="bLineLate" title="]" data-i18n>Line later</button>
+      <span class="sep"></span>
+      <button id="bAllEarly" title="Shift+[" data-i18n>All earlier</button><button id="bAllLate" title="Shift+]" data-i18n>All later</button>
+      <span class="hint" data-i18n>Earlier / later moves every mora of the line, and its end, together; Ctrl+Z undoes it</span>
+    </div>
+    <div id="linebar">
+      <span data-i18n>Line</span>
+      <button id="bEdit" title="E" data-i18n>✎ Edit text / readings</button>
+      <span class="sep"></span>
+      <button id="bSplit" title="Make the selected mora and everything after it a new line" data-i18n="text title">Split at the selected mora</button>
+      <button id="bMerge" title="Append the next line to this one" data-i18n="text title">Merge with next</button>
+      <button id="bInsert" title="Add a line after this one" data-i18n="text title">Add a line after</button>
+      <button id="bDelete" class="danger" data-i18n>Delete line</button>
+      <span class="hint" data-i18n>All of these can be undone with Ctrl+Z; nothing is written to the project until you save</span>
+    </div>
+    <div id="draft"><span id="draftMsg"></span><button id="bRestore" data-i18n>Restore draft</button><button id="bDiscard" data-i18n>Discard</button></div>
+    <div id="title"></div>
+    <div id="sub"></div>
+    <div id="morae"></div>
+    <div id="wavebox"><canvas id="wave"></canvas><canvas id="scroll" title="Whole song: the bright box is the range shown in the waveform above; drag it to scroll sideways" data-i18n="title"></canvas></div>
+    <div id="help" data-i18n-html="help">
+      <kbd>Space</kbd> play / pause　<kbd>R</kbd> replay from 1 s before this line　<kbd>J</kbd>/<kbd>F</kbd> tap: press at the instant each mora is sung — it records the current mora and moves to the next (the last press records the line end)　<kbd>K</kbd> mark the current mora as tied (no onset of its own; its time is interpolated)<br>
+      <kbd>Backspace</kbd> go back one mora and tap it again　<kbd>←</kbd><kbd>→</kbd> select a mora　<kbd>,</kbd><kbd>.</kbd> nudge ±10 ms (with <kbd>Shift</kbd> ±50 ms)　<kbd>Q</kbd> snap to the nearest vocal onset　<kbd>?</kbd> mark as uncertain<br>
+      <kbd>[</kbd><kbd>]</kbd> move the whole line earlier / later (by the seconds in the “Shift” box)　<kbd>Shift</kbd>+<kbd>[</kbd><kbd>]</kbd> move every line earlier / later<br>
+      <kbd>E</kbd> edit this line's text and readings (merge, split, add and delete are in the “Line” row)　<kbd>Enter</kbd> confirm this line and go to the next　<kbd>↑</kbd><kbd>↓</kbd> change line　<kbd>1</kbd>–<kbd>4</kbd> speed 0.5/0.6/0.75/1　<kbd>V</kbd> vocals / full mix　<kbd>Ctrl+Z</kbd> undo　<kbd>Ctrl+S</kbd> save　<kbd>P</kbd> view this line in the video<br>
+      Waveform: click an empty spot to play from there; drag a vertical line to change its time; scroll to zoom. Thin lines = 16th notes, bright lines = beats, thick lines = bars. The short ticks along the bottom show vocal onset strength.<br>
+      Scrolling sideways: drag the bright box in the whole-song strip under the waveform (click outside the box and it jumps there); or hold an empty spot of the waveform and drag left / right; or use a horizontal wheel / <kbd>Shift</kbd>+wheel; <kbd>Shift</kbd>+<kbd>←</kbd><kbd>→</kbd> scrolls half a screen. When the playhead runs off the right edge the view pages forward by itself. The small bars at the bottom of the strip are the lines (green = confirmed, pink = current line).
+    </div>
+  </main>
+</div>
+<div id="toast"></div>
+<div id="calib"><div class="box">
+  <div data-i18n-html="calib"><b>Latency calibration</b><br>
+  The song plays at 1× from the drums of the intro. Press <kbd>J</kbd> on <b>every beat</b> (quarter notes); after 16 presses your key latency (headphone / audio-device delay + reaction time) is worked out, and from then on it is subtracted from every tap.</div>
+  <div class="big" id="calN">0 / 16</div>
+  <div id="calR" style="text-align:center;color:var(--dim)"></div>
+  <div style="text-align:center;margin-top:10px"><button id="calGo" data-i18n>Start</button> <button id="calClose" data-i18n>Close</button></div>
+</div></div>
+
+<div id="editor"><div class="box">
+  <h2 id="edHead" data-i18n>Edit text and readings</h2>
+  <div id="edPrev"></div>
+  <div class="lab" data-i18n>Text (just type; a space = phrase break — phrases can be laid out separately on screen)</div>
+  <input id="edText" type="text" autocomplete="off" spellcheck="false">
+  <div class="lab" data-i18n>Readings (kana under each kanji; kana themselves rarely need touching. When two or more characters share one reading — 今日 read きょう — click “join” to connect them)</div>
+  <div id="edCells"></div>
+  <div id="edInfo"></div>
+  <div class="btns"><span class="hint" data-i18n>Ctrl+Enter apply　Esc cancel</span><button id="edCancel" data-i18n>Cancel</button><button id="edApply" data-i18n>Apply</button></div>
+</div></div>
+
+<audio id="aVox" preload="auto" src="../data/audio/vocals.m4a"></audio>
+<audio id="aMix" preload="auto" src="../data/audio/audio.m4a"></audio>
+<script src="../data/derived/vocal_onset.js"></script>
+<script src="../tools/i18n.js"></script>
+<script src="lang.zh-cn.js"></script>
+<script>
+'use strict';
+// All UI text is written in English (the English is the source string and also the dictionary key); the Chinese is in lang.zh-cn.js (see tools/i18n.js for how it works). When you add or reword a UI string, add or update its entry there too.
+I18N.apply();
+// A line's status in the timeline file (same as ST_EST / ST_OK in lyrics.py): what goes into the file is always these two English words, whatever the UI language; for display, use tr(l.status).
+const ST_EST = 'estimated', ST_OK = 'confirmed';
+const TIMING_URL = '../lyrics/timing.txt';
+const SAVE_URL = '/__save_timing';
+let MV_URL = '../template/index.html', BAR = 0;      // set at startup from /__project: the current version, and the bar offset
+let LS_DRAFT = 'timing-draft';                          // the project's slug is appended at startup, so drafts don't get mixed up when another project is served on the same port
+const LS_PREF = 'timing-pref';
+const $ = s => document.querySelector(s);
+const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+const lerp = (a, b, k) => a + (b - a) * k;
+
+/* ------------------------------------------------------------ timeline format (same as lyric-tool/lyrics.py) */
+const fmt = t => { t = Math.round(t * 100 + 1e-6) / 100; const m = Math.floor(t / 60); return String(m).padStart(2, '0') + ':' + (t - 60 * m).toFixed(2).padStart(5, '0'); };
+const fmtS = t => (t == null ? '' : fmt(t).replace(/^00:/, ''));
+const parseTime = s => { const m = /^(\d+):(\d+(?:\.\d+)?)$/.exec(s); if (!m) throw new Error(tr('Bad time format: {0}', s)); return +m[1] * 60 + +m[2]; };
+const dwidth = s => [...s].reduce((a, c) => a + (c.codePointAt(0) > 0x2E7F ? 2 : 1), 0);
+const pad = (s, w) => s + ' '.repeat(Math.max(1, w - dwidth(s)));
+
+function parseTiming(text) {
+  const lines = [], head = [];
+  let cur = null;
+  for (const raw of text.split(/\r?\n/)) {
+    const s = raw.trim();
+    if (!s) continue;
+    if (s.startsWith('#') && !s.startsWith('##')) { if (!lines.length) head.push(raw); continue; }
+    if (s.startsWith('##')) {
+      const m = /^##\s*(\d+)\s*(?:[(（]([^)）]*)[)）])?\s*(.*)$/.exec(s);
+      cur = { no: +m[1], status: (m[2] || ST_EST).trim(), rows: [], end: null, from: [+m[1]] };     // from: which line(s) of the last save this line came from (numbers change after a merge / split / add / delete)
+      lines.push(cur);
+      continue;
+    }
+    const p = s.split(/\s+/);
+    if (p.length === 2 && p[1] === '.') { cur.end = parseTime(p[0].replace(/\?$/, '')); continue; }
+    const [tm, a, b] = p, disp = p.length >= 3 ? a : '', kana = p.length >= 3 ? b : a;
+    const tied = tm.startsWith('~'), unc = tm.endsWith('?'), nw = disp.startsWith('/');
+    cur.rows.push({ t: tied ? null : parseTime(tm.replace(/\?$/, '')), tied, unc, disp: nw ? disp.slice(1) : disp, kana, new: nw || !cur.rows.length });
+  }
+  return { head, lines };
+}
+function phrasesOf(rows) { const out = []; let cur = []; rows.forEach((r, i) => { if (r.new && i) { out.push(cur); cur = []; } cur.push(r); }); out.push(cur); return out; }
+function serialize(doc) {
+  const out = [doc.head.join('\n'), ''];
+  for (const L of doc.lines) {
+    out.push(`## ${String(L.no).padStart(2, '0')}  (${L.status})  ${phrasesOf(L.rows).map(p => p.map(r => r.disp).join('')).join(' / ')}`);
+    L.rows.forEach((r, i) => {
+      const tm = (r.tied ? '~' : fmt(r.t)) + (r.unc ? '?' : '');
+      out.push(tm.padEnd(10) + pad((r.new && i ? '/' : '') + r.disp, 6) + r.kana);
+    });
+    out.push(fmt(L.end).padEnd(10) + '.', '');
+  }
+  return out.join('\n');
+}
+// Tied ("~") morae: interpolate between the timed morae before and after (same as resolve in lyrics.py)
+function resolved(L) {
+  const ts = L.rows.map(r => (r.tied ? null : r.t));
+  for (let i = 0; i < ts.length; i++) {
+    if (ts[i] != null) continue;
+    let a = i - 1; while (a >= 0 && L.rows[a].tied) a--;
+    let b = i + 1; while (b < ts.length && L.rows[b].tied) b++;
+    const ta = a >= 0 ? L.rows[a].t : null, tb = b < ts.length ? L.rows[b].t : L.end;
+    ts[i] = ta == null ? tb - .1 * (b - i) : lerp(ta, tb, (i - a) / (b - a));
+  }
+  return ts;
+}
+
+/* ------------------------------------------------------------ lines ↔ morae (same as morae_of / tokens_of in lyric-tool/lyrics.py; change one and the other must change too) */
+const OPEN = '「『（(', CLOSE = '」』）)？！、。?!', MERGE = 'ゃゅょぁぃぅぇぉゎャュョァィゥェォヮっッー';
+const isKana = ch => /^[\u3041-\u3096\u30a1-\u30fa\u30fc]$/.test(ch);
+const isPunct = ch => OPEN.includes(ch) || CLOSE.includes(ch);
+// the morae of one line → tokens: { d display, r reading } / { p punctuation } / null for a phrase boundary
+function tokensOf(rows) {
+  const toks = [];
+  rows.forEach((row, i) => {
+    if (row.new && i) toks.push(null);
+    let d = [...row.disp], k = [...row.kana];
+    const head = [], tail = [], merged = [];
+    while (d.length && OPEN.includes(d[0])) head.push(d.shift());
+    while (d.length && CLOSE.includes(d[d.length - 1])) tail.unshift(d.pop());
+    while (k.length > 1 && d.length && MERGE.includes(d[d.length - 1]) && d[d.length - 1] === k[k.length - 1]) { merged.unshift(d.pop()); k.pop(); }
+    head.forEach(c => toks.push({ p: c }));
+    if (d.length) toks.push({ d: d.join(''), r: k.join('') });
+    else { const last = toks.findLast(t => t && t.d != null); if (last) last.r += k.join(''); else toks.push({ d: k.join(''), r: k.join('') }); }
+    merged.forEach(c => toks.push({ d: c, r: c }));
+    tail.forEach(c => toks.push({ p: c }));
+  });
+  return toks;
+}
+// tokens → morae (disp / kana / new): one kana per mora; small kana, sokuon and the long-vowel mark merge into the previous mora; punctuation attaches to the neighbouring character
+function moraeOf(toks) {
+  const phrases = [[]];
+  let pending = '';
+  for (const t of toks) {
+    if (t === null) { phrases.push([]); continue; }
+    const ph = phrases[phrases.length - 1];
+    if (t.p != null) { if (OPEN.includes(t.p) || !ph.length) pending += t.p; else ph[ph.length - 1].disp += t.p; continue; }
+    [...t.r].forEach((k, j) => { ph.push({ disp: j === 0 ? pending + t.d : '', kana: k }); if (j === 0) pending = ''; });
+  }
+  const rows = [];
+  for (const ph of phrases) {
+    const mor = [];
+    for (const a of ph) {
+      if (MERGE.includes(a.kana) && mor.length) { mor[mor.length - 1].kana += a.kana; mor[mor.length - 1].disp += a.disp; }
+      else mor.push({ ...a });
+    }
+    mor.forEach((m, i) => rows.push({ disp: m.disp, kana: m.kana, new: i === 0 }));
+  }
+  return rows;
+}
+const esc = s => s.replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+// how readings are shown: the reading above the kanji, one separator between phrases
+function rubyHTML(toks, sep = '　') {
+  return toks.map(t => t === null ? sep : t.p != null ? esc(t.p)
+    : t.d === t.r ? esc(t.d) : `<ruby>${esc(t.d)}<rt>${t.r ? esc(t.r) : '<span class="miss">？</span>'}</rt></ruby>`).join('');
+}
+
+/* ------------------------------------------------------------ state */
+let doc = null, savedText = '', li = 0, cur = 0, undo = [], redo = [];
+let pref = { rate: .75, src: 'vox', lat: 0 };
+try { Object.assign(pref, JSON.parse(localStorage.getItem(LS_PREF) || '{}')); } catch {}
+const savePref = () => { try { localStorage.setItem(LS_PREF, JSON.stringify(pref)); } catch {} };
+const A = { vox: $('#aVox'), mix: $('#aMix') };
+const act = () => A[pref.src];
+let view = { t0: 0, t1: 5 }, stopAt = null;
+const L = () => doc.lines[li];
+
+function snapshot() { undo.push(JSON.stringify(doc.lines)); if (undo.length > 200) undo.shift(); redo = []; }
+// persist=false: only refresh the UI, don't write the draft (used when the page opens, so that the unsaved draft from last time isn't overwritten)
+function changed(persist = true) {
+  const text = serialize(doc);
+  if (persist) try { localStorage.setItem(LS_DRAFT, JSON.stringify({ text, at: Date.now() })); } catch {}
+  $('#saved').textContent = text === savedText ? tr('Saved') : tr('Unsaved changes');
+  $('#saved').classList.toggle('dirty', text !== savedText);
+  render();
+}
+function toast(msg, ms = 2600) { const t = $('#toast'); t.textContent = msg; t.classList.add('show'); clearTimeout(toast.h); toast.h = setTimeout(() => t.classList.remove('show'), ms); }
+
+/* ------------------------------------------------------------ playback and time */
+// The song time a key press corresponds to: read the current playback position, then subtract the time that passed between the press and the handling of this event (scaled by the playback rate)
+function mediaAt(ts) {
+  const a = act();
+  if (a.paused) return a.currentTime;
+  return a.currentTime - Math.max(0, performance.now() - ts) / 1000 * a.playbackRate;
+}
+function setRate(r) { pref.rate = r; A.vox.playbackRate = A.mix.playbackRate = r; savePref(); render(); }
+function play(from, until = null) {
+  const a = act();
+  if (from != null) a.currentTime = Math.max(0, from);
+  stopAt = until;
+  a.playbackRate = pref.rate;
+  a.play();
+}
+function pause() { act().pause(); stopAt = null; }
+function toggleSrc() {
+  const a = act(), t = a.currentTime, playing = !a.paused;
+  a.pause();
+  pref.src = pref.src === 'vox' ? 'mix' : 'vox'; savePref();
+  const b = act(); b.currentTime = t; b.playbackRate = pref.rate;
+  if (playing) b.play();
+  render();
+}
+function lineRange(k = li) { const l = doc.lines[k]; return [l.rows[0].t ?? resolved(l)[0], l.end]; }
+function playLine() { const [a, b] = lineRange(); play(a - 1.0, b + .6); }
+
+function tick() {
+  const a = act();
+  if (!a.paused && stopAt != null && a.currentTime >= stopAt) pause();
+  const tp = a.currentTime;
+  if (!a.paused && !drag && !pan && !sdrag && wasInside && tp > view.t1) setView(tp - (view.t1 - view.t0) * .08);
+  wasInside = tp >= view.t0 && tp <= view.t1;
+  drawWave();
+  highlightPlaying();
+  requestAnimationFrame(tick);
+}
+
+/* ------------------------------------------------------------ editing */
+function tap(ts) {
+  const l = L(), t = Math.round((mediaAt(ts) - pref.lat * pref.rate) * 100) / 100;
+  snapshot();
+  if (cur >= l.rows.length) { l.end = t; }
+  else {
+    const r = l.rows[cur];
+    r.t = t; r.tied = false;
+    cur++;
+  }
+  changed();
+}
+function tie() {
+  const l = L();
+  if (cur >= l.rows.length) return;
+  if (cur === 0) { toast(tr('The first mora of a line needs an onset time of its own; it can\'t be tied')); return; }
+  snapshot();
+  l.rows[cur].tied = true; l.rows[cur].t = null; cur++;
+  changed();
+}
+function nudge(d) {
+  const l = L();
+  snapshot();
+  if (cur >= l.rows.length) l.end = Math.round((l.end + d) * 100) / 100;
+  else { const r = l.rows[cur]; if (r.tied) { r.t = resolved(l)[cur]; r.tied = false; } r.t = Math.round((r.t + d) * 100) / 100; }
+  changed();
+}
+function snapOnset() {
+  const l = L();
+  if (cur >= l.rows.length || !window.VOX) return;
+  const r = l.rows[cur], t0 = r.tied ? resolved(l)[cur] : r.t, f = VOX.fps;
+  let best = -1, bt = t0;
+  for (let i = Math.round((t0 - .08) * f); i <= Math.round((t0 + .08) * f); i++) if (VOX.flux[i] > best) { best = VOX.flux[i]; bt = i / f; }
+  snapshot(); r.t = Math.round(bt * 100) / 100; r.tied = false; changed();
+}
+function toggleUnc() { const l = L(); if (cur >= l.rows.length) return; snapshot(); l.rows[cur].unc = !l.rows[cur].unc; changed(); }
+function confirmLine() {
+  const l = L(), ts = resolved(l);
+  for (let i = 1; i < ts.length; i++) if (ts[i] < ts[i - 1]) { toast(tr('Mora {0} is earlier than the one before it — fix that first', i + 1)); cur = i; render(); return; }
+  if (l.end < ts[ts.length - 1]) { toast(tr('The line end is earlier than the last mora')); cur = l.rows.length; render(); return; }
+  snapshot(); l.status = ST_OK; changed();
+  if (li + 1 < doc.lines.length) gotoLine(li + 1);
+}
+function gotoLine(k) {
+  li = clamp(k, 0, doc.lines.length - 1); cur = 0;
+  const [a, b] = lineRange(); view = { t0: a - 1.0, t1: b + .8 };
+  render();
+  document.querySelector('.li.cur')?.scrollIntoView({ block: 'nearest' });
+}
+function doUndo() { if (!undo.length) return; redo.push(JSON.stringify(doc.lines)); doc.lines = JSON.parse(undo.pop()); li = Math.min(li, doc.lines.length - 1); cur = Math.min(cur, L().rows.length); changed(); }
+function doRedo() { if (!redo.length) return; undo.push(JSON.stringify(doc.lines)); doc.lines = JSON.parse(redo.pop()); li = Math.min(li, doc.lines.length - 1); cur = Math.min(cur, L().rows.length); changed(); }
+
+/* ------------------------------------------------------------ shift: this line / all lines; every mora of a line moves together with its line end */
+const r2 = t => Math.round(t * 100) / 100;
+function shiftAmount() {
+  const v = Math.abs(parseFloat($('#shiftVal').value));
+  if (!isFinite(v) || v <= 0) { toast(tr('Enter a number of seconds greater than 0 in the “Shift” box first')); return 0; }
+  if (v > 10) { toast(tr('At most 10 seconds per shift')); return 0; }
+  return r2(v);
+}
+function shiftLines(idx, d) {
+  for (const k of idx) {
+    const l = doc.lines[k], first = l.rows.find(r => r.t != null);
+    if (first && first.t + d < 0) { toast(tr('Line {0} would start before 0 s; nothing was moved', l.no)); return false; }
+  }
+  snapshot();
+  for (const k of idx) {
+    const l = doc.lines[k];
+    l.rows.forEach(r => { if (r.t != null) r.t = r2(r.t + d); });
+    l.end = r2(l.end + d);
+  }
+  return true;
+}
+function overlapNote(k) {   // warn when the shifted line overlaps the one before or after (doesn't block the shift)
+  const l = doc.lines[k], ts = resolved(l), a = doc.lines[k - 1], b = doc.lines[k + 1], out = [];
+  if (a && ts[0] < a.end) out.push(tr('it overlaps the end of line {0}', a.no));
+  if (b && l.end > resolved(b)[0]) out.push(tr('its end runs past the start of line {0}', b.no));
+  return out.join(tr(', @@between clauses'));
+}
+function shiftLine(dir) {
+  const v = shiftAmount(); if (!v) return;
+  if (!shiftLines([li], dir * v)) return;
+  changed();
+  const note = overlapNote(li);
+  toast((dir < 0 ? tr('Line {0} moved {1} s earlier', L().no, v.toFixed(2)) : tr('Line {0} moved {1} s later', L().no, v.toFixed(2))) + (note ? tr('　Note: {0}', note) : ''));
+}
+function shiftAll(dir) {
+  const v = shiftAmount(); if (!v) return;
+  if (!confirm(dir < 0 ? tr('Move all {0} lines {1} s earlier? (Ctrl+Z undoes it)', doc.lines.length, v.toFixed(2)) : tr('Move all {0} lines {1} s later? (Ctrl+Z undoes it)', doc.lines.length, v.toFixed(2)))) return;
+  if (!shiftLines(doc.lines.map((_, k) => k), dir * v)) return;
+  changed();
+  toast(dir < 0 ? tr('All {0} lines moved {1} s earlier. Takes effect once saved (Ctrl+S)', doc.lines.length, v.toFixed(2)) : tr('All {0} lines moved {1} s later. Takes effect once saved (Ctrl+S)', doc.lines.length, v.toFixed(2)));
+}
+
+/* ------------------------------------------------------------ editing a line's text / readings
+ * The editor has one cell per character: c = a character with a reading (r = the reading; join = shares one reading with the next cell), p = punctuation, sp = a phrase boundary. */
+let ed = null;
+function cellsOf(toks) {
+  const cells = [];
+  for (const t of toks) {
+    if (t === null) cells.push({ k: 'sp', ch: ' ' });
+    else if (t.p != null) cells.push({ k: 'p', ch: t.p });
+    else { const cs = [...t.d]; cs.forEach((ch, i) => cells.push({ k: 'c', ch, r: i === 0 ? t.r : '', join: i + 1 < cs.length })); }
+  }
+  return cells;
+}
+function toksOfCells(cells) {
+  const toks = [];
+  for (let i = 0; i < cells.length; i++) {
+    const c = cells[i];
+    if (c.k === 'sp') { if (toks.length && toks[toks.length - 1] !== null) toks.push(null); }
+    else if (c.k === 'p') toks.push({ p: c.ch });
+    else { let d = c.ch, j = i; while (cells[j].join && cells[j + 1] && cells[j + 1].k === 'c') d += cells[++j].ch; toks.push({ d, r: (c.r || '').trim() }); i = j; }
+  }
+  while (toks.length && toks[toks.length - 1] === null) toks.pop();
+  return toks;
+}
+// Readings already used somewhere in the song: a newly typed kanji gets its first guess from them (blue = guessed, needs checking)
+function readingDict() {
+  const dict = new Map();
+  for (const l of doc.lines) for (const t of tokensOf(l.rows)) if (t && t.d != null && t.d !== t.r && !dict.has(t.d)) dict.set(t.d, t.r);
+  return dict;
+}
+// After the text changes: untouched characters keep their readings and joins; new characters are guessed from the dictionary
+function retext(text) {
+  const chars = [...text.replace(/\u3000/g, ' ')], old = ed.cells, n = old.length, m = chars.length;
+  const dp = Array.from({ length: n + 1 }, () => new Int32Array(m + 1));
+  for (let i = n - 1; i >= 0; i--) for (let j = m - 1; j >= 0; j--) dp[i][j] = old[i].ch === chars[j] ? dp[i + 1][j + 1] + 1 : Math.max(dp[i + 1][j], dp[i][j + 1]);
+  const cells = [], src = [];
+  for (let i = 0, j = 0; j < m;) {
+    if (i < n && old[i].ch === chars[j]) { cells.push({ ...old[i] }); src.push(i); i++; j++; }
+    else if (i < n && dp[i + 1][j] >= dp[i][j + 1]) i++;
+    else { const ch = chars[j]; cells.push(ch === ' ' ? { k: 'sp', ch } : isPunct(ch) ? { k: 'p', ch } : { k: 'c', ch, r: isKana(ch) ? ch : '', join: false, fresh: true }); src.push(-1); j++; }
+  }
+  cells.forEach((c, x) => { if (c.join && !(cells[x + 1] && cells[x + 1].k === 'c' && src[x] >= 0 && src[x + 1] === src[x] + 1)) c.join = false; });
+  for (let x = 0; x < cells.length; x++) {          // new kanji: look for the longest word in the dictionary first, then the single character
+    if (!cells[x].fresh || cells[x].r) continue;
+    let done = false;
+    for (let len = 4; len >= 1 && !done; len--) {
+      const run = cells.slice(x, x + len);
+      if (run.length < len || run.some(c => c.k !== 'c' || !c.fresh || c.r)) continue;
+      const r = ed.dict.get(run.map(c => c.ch).join(''));
+      if (r) { run.forEach((c, y) => { c.join = y + 1 < len; c.guess = true; }); cells[x].r = r; done = true; }
+    }
+  }
+  ed.cells = cells;
+}
+function openEditor(mode) {
+  if (!doc) return;
+  pause();
+  ed = { mode, dict: readingDict(), cells: mode === 'edit' ? cellsOf(tokensOf(L().rows)) : [] };
+  $('#edHead').textContent = mode === 'edit' ? tr('Edit text and readings · line {0}', L().no) : tr('Add a line after line {0}', L().no);
+  $('#edText').value = ed.cells.map(c => c.ch).join('');
+  $('#editor').classList.add('show');
+  renderCells(); renderEdInfo();
+  setTimeout(() => $('#edText').focus(), 0);
+}
+function closeEditor() { ed = null; $('#editor').classList.remove('show'); }
+function renderCells() {
+  const cells = ed.cells;
+  let html = '';
+  for (let i = 0; i < cells.length; i++) {
+    const c = cells[i];
+    if (c.k === 'sp') { html += '<div class="cell gap">/</div>'; continue; }
+    if (c.k === 'p') { html += `<div class="cell pu"><div class="ch">${esc(c.ch)}</div></div>`; continue; }
+    let j = i, d = c.ch; while (cells[j].join && cells[j + 1] && cells[j + 1].k === 'c') d += cells[++j].ch;
+    const plain = [...d].every(isKana), nx = cells[j + 1], canJoin = nx && nx.k === 'c' && !(plain && isKana(nx.ch));
+    html += `<div class="cell${plain ? ' kana' : ''}${c.guess ? ' guess' : ''}" data-i="${i}"><div class="ch">${esc(d)}</div>`
+      + `<input value="${esc(c.r || '')}" data-i="${i}" style="width:${Math.max(plain ? 2 : 3.2, [...(c.r || '')].length + 1.2)}em" autocomplete="off" spellcheck="false">`
+      + `<div class="ops">${canJoin ? `<button data-join="${j}" title="${tr('Share one reading with the character to the right')}">${tr('join')}</button>` : ''}${j > i ? `<button data-split="${i}" title="${tr('Back to one reading per character')}">${tr('split')}</button>` : ''}</div></div>`;
+    i = j;
+  }
+  $('#edCells').innerHTML = html || `<span style="color:var(--dim)">${tr('Type the text above first')}</span>`;
+}
+const kanaOnly = r => r.length > 0 && [...r].every(isKana);
+function edResult() {          // → { toks, rows, err }
+  const toks = toksOfCells(ed.cells), bad = toks.filter(t => t && t.d != null && !kanaOnly(t.r));
+  const rows = bad.length ? [] : moraeOf(toks);
+  let err = '';
+  if (!toks.some(t => t && t.d != null)) err = tr('The line is empty');
+  else if (bad.length) err = tr('{0} reading{0:|s} still missing or not kana: {1}', bad.length, bad.map(t => t.d).join(tr(', @@in a list')));
+  else if (MERGE.includes(rows[0].kana[0])) err = tr('A line can\'t start with a small kana, a sokuon (っ) or a long-vowel mark (ー)');
+  return { toks, rows, err };
+}
+function renderEdInfo() {
+  const { toks, rows, err } = edResult();
+  $('#edPrev').innerHTML = rubyHTML(toks, '<span class="br">/</span>') || '&nbsp;';
+  document.querySelectorAll('#edCells .cell[data-i]').forEach(el => el.classList.toggle('bad', !kanaOnly((ed.cells[+el.dataset.i].r || '').trim())));
+  let info = '';
+  if (err) info = `<span class="w">${esc(err)}</span>`;
+  else if (ed.mode === 'edit') {
+    const { kept } = carryTiming(L(), rows);
+    info = `<b>${tr('{0} {0:mora|morae}', rows.length)}</b>${tr(' (was {0}): ', L().rows.length)}${rows.map(r => r.kana).join(' ')}\n`
+      + (kept === rows.length && rows.length === L().rows.length ? tr('The morae are unchanged; every time is kept.')
+        : tr('Times kept for {0} {0:mora|morae}; the other {1} {1:is|are} spread evenly between the neighbours and marked “?”. The line goes back to “estimated” — tap it again after applying.', kept, rows.length - kept));
+  } else info = `<b>${tr('{0} {0:mora|morae}', rows.length)}</b>${tr(': ')}${rows.map(r => r.kana).join(' ')}\n${tr('The new line goes into the gap after line {0} with evenly spread times; tap it after applying.', L().no)}`;
+  $('#edInfo').innerHTML = info;
+  $('#edApply').disabled = !!err;
+}
+// New morae take their times from the old ones: morae with the same reading in the same order (longest common subsequence) keep theirs; the rest are spread evenly between the known times on either side and marked uncertain
+function carryTiming(old, rows) {
+  const o = old.rows, ots = resolved(old), n = o.length, m = rows.length;
+  const dp = Array.from({ length: n + 1 }, () => new Int32Array(m + 1));
+  for (let i = n - 1; i >= 0; i--) for (let j = m - 1; j >= 0; j--) dp[i][j] = o[i].kana === rows[j].kana ? dp[i + 1][j + 1] + 1 : Math.max(dp[i + 1][j], dp[i][j + 1]);
+  const out = rows.map(r => ({ t: null, tied: false, unc: true, disp: r.disp, kana: r.kana, new: r.new })), known = new Array(m).fill(null);
+  let kept = 0;
+  for (let i = 0, j = 0; i < n && j < m;) {
+    if (o[i].kana === rows[j].kana) { Object.assign(out[j], { t: o[i].t, tied: o[i].tied, unc: o[i].unc }); known[j] = ots[i]; kept++; i++; j++; }
+    else if (dp[i + 1][j] >= dp[i][j + 1]) i++; else j++;
+  }
+  if (known[0] == null) known[0] = ots[0];
+  if (out[0].tied || out[0].t == null) Object.assign(out[0], { t: r2(known[0]), tied: false });
+  for (let j = 1; j < m; j++) {
+    if (known[j] != null) continue;
+    let b = j; while (b < m && known[b] == null) b++;
+    const ta = known[j - 1], tb = b < m ? known[b] : Math.max(old.end, ta + .1 * (b - j + 1));
+    for (let x = j; x < b; x++) { known[x] = lerp(ta, tb, (x - j + 1) / (b - j + 1)); out[x].t = r2(known[x]); }
+    j = b;
+  }
+  return { rows: out, kept };
+}
+function applyEditor() {
+  const { rows, err } = edResult();
+  if (err) { toast(err); return; }
+  snapshot();
+  if (ed.mode === 'edit') {
+    const l = L(), same = rows.length === l.rows.length, r = carryTiming(l, rows);
+    l.rows = r.rows;
+    if (!(same && r.kept === rows.length)) l.status = ST_EST;
+    const last = resolved(l)[l.rows.length - 1];
+    if (l.end < last + .05) l.end = r2(last + .3);
+    cur = Math.min(cur, l.rows.length);
+  } else {
+    const prev = L(), nxt = doc.lines[li + 1], t0 = r2(prev.end + .05);
+    let t1 = nxt ? r2(resolved(nxt)[0] - .05) : r2(t0 + Math.max(2, rows.length * .25));
+    const tight = t1 - t0 < .6;
+    if (tight) t1 = r2(t0 + Math.max(1.5, rows.length * .2));
+    const nr = rows.map((r, i) => ({ t: r2(lerp(t0, t1, i / (rows.length + 1))), tied: false, unc: true, disp: r.disp, kana: r.kana, new: r.new }));
+    doc.lines.splice(li + 1, 0, { no: 0, status: ST_EST, rows: nr, end: t1, from: [] });
+    renumber();
+    closeEditor(); gotoLine(li + 1); changed();
+    toast(tight ? tr('Added. The next line follows right away, so the new line overlaps it for now — move it apart when you tap it') : tr('Added with evenly spread times — tap it'));
+    return;
+  }
+  closeEditor(); changed();
+}
+
+/* ------------------------------------------------------------ merging / splitting / deleting lines. Lines are renumbered in order */
+function renumber() { doc.lines.forEach((l, k) => (l.no = k)); }
+function mergeNext() {
+  const a = L(), b = doc.lines[li + 1];
+  if (!b) { toast(tr('This is the last line; there is nothing after it to merge with')); return; }
+  snapshot();
+  const ts = resolved(b);
+  b.rows[0].new = true;
+  if (b.rows[0].tied || b.rows[0].t == null) Object.assign(b.rows[0], { t: r2(ts[0]), tied: false });
+  a.rows.push(...b.rows); a.end = b.end;
+  a.status = a.status === ST_OK && b.status === ST_OK ? ST_OK : ST_EST;
+  a.from = a.from && b.from ? [...a.from, ...b.from] : null;
+  doc.lines.splice(li + 1, 1); renumber();
+  const [s, e] = lineRange(); view = { t0: s - 1.0, t1: e + .8 };
+  changed();
+  toast(tr('Line {0} was merged with the next one (which became its last phrase)', a.no));
+}
+function splitHere() {
+  const l = L(), r = l.rows[cur];
+  if (cur <= 0 || cur >= l.rows.length) { toast(tr('First click the mora that should start the new line (not the first mora, not the line end)')); return; }
+  const d0 = [...r.disp].filter(c => !OPEN.includes(c))[0];
+  if (!d0 || MERGE.includes(d0)) { toast(tr('This mora is in the middle of a character\'s reading, so the line can\'t be split here. Pick the first mora of a character')); return; }
+  snapshot();
+  const ts = resolved(l), b = { no: 0, status: l.status, rows: l.rows.splice(cur), end: l.end, from: l.from ? [...l.from] : null };
+  Object.assign(b.rows[0], { new: true, t: r2(ts[cur]), tied: false });
+  l.end = r2(Math.max(ts[cur - 1] + .1, Math.min(ts[cur] - .05, ts[cur - 1] + 1.5)));
+  doc.lines.splice(li + 1, 0, b); renumber();
+  cur = 0; const [s, e] = lineRange(); view = { t0: s - 1.0, t1: e + .8 };
+  changed();
+  toast(tr('Split into lines {0} and {1}. The end of the first one is a guess — listen to it', l.no, b.no));
+}
+function deleteLine() {
+  if (doc.lines.length <= 1) { toast(tr('Only one line is left; it can\'t be deleted')); return; }
+  const l = L(), txt = phrasesOf(l.rows).map(p => p.map(r => r.disp).join('')).join(' ');
+  if (!confirm(`${tr('Delete line {0}?', l.no)}\n\n${txt}\n\n${tr('(Ctrl+Z undoes it)')}`)) return;
+  snapshot();
+  doc.lines.splice(li, 1); renumber();
+  gotoLine(Math.min(li, doc.lines.length - 1)); changed();
+}
+// Which line numbers changed since the last save (everything in the storyboard that refers to a line by number has to follow)
+function renumberNote() {
+  const ls = doc.lines;
+  if (ls.some(l => !l.from)) return ls.length !== savedCount ? tr('The number of lines went from {0} to {1}; the lines after the change have new numbers', savedCount, ls.length) : '';
+  const out = [], seen = new Set(ls.flatMap(l => l.from)), group = new Map();
+  ls.forEach((l, k) => { const key = l.from.join('+'); if (l.from.length) group.set(key, [...(group.get(key) || []), k]); });
+  for (let k = 0; k < savedCount; k++) if (!seen.has(k)) out.push(tr('old line {0} was deleted', k));
+  for (let k = 0; k < ls.length; k++) {
+    const f = ls[k].from, ks = group.get(f.join('+'));
+    if (!f.length) { out.push(tr('line {0} is new', k)); continue; }
+    if (ks.length > 1) { if (ks[0] === k) out.push(f.length > 1 ? tr('old lines {0} were re-divided into lines {1}', f.join(tr(', @@in a list')), ks.join(tr(', @@in a list'))) : tr('old line {0} was split into lines {1}', f[0], ks.join(tr(', @@in a list')))); continue; }
+    if (f.length > 1) { out.push(tr('old lines {0} were merged into line {1}', f.join(tr(', @@in a list')), k)); continue; }
+    if (f[0] === k) continue;
+    const plain = x => ls[x] && ls[x].from.length === 1 && group.get(String(ls[x].from[0])).length === 1;
+    let e = k; while (plain(e + 1) && ls[e + 1].from[0] - (e + 1) === f[0] - k) e++;
+    out.push(e > k ? tr('old {0} → now {1}', `${f[0]}–${ls[e].from[0]}`, `${k}–${e}`) : tr('old {0} → now {1}', f[0], k));
+    k = e;
+  }
+  return out.join('\n');
+}
+let savedCount = 0;
+
+async function save() {
+  const note = renumberNote();
+  if (note && !confirm(`${tr('Line numbers have changed:')}\n\n${note}\n\n${tr('Everything in the storyboard (js/scenes.js of the current version) that refers to a line by its number — LT(n), li: n and the like — has to be changed to match, or lyrics will end up on the wrong shots.')}\n\n${tr('Save anyway?')}`)) return false;
+  const text = serialize(doc);
+  try {
+    const r = await fetch(SAVE_URL, { method: 'POST', headers: { 'Content-Type': 'text/plain; charset=utf-8' }, body: text });
+    const j = await r.json();
+    if (!j.ok) throw new Error(j.msg);
+    savedText = text; savedCount = doc.lines.length; doc.lines.forEach(l => (l.from = [l.no])); undo = []; redo = [];
+    changed();
+    toast(tr('Saved; the video\'s lyrics were regenerated') + '\n' + j.msg.split('\n').slice(-3).join('\n') + (note ? '\n\n' + tr('Remember to update the line numbers in the storyboard') : ''), note ? 7000 : 2600);
+    return true;
+  } catch (e) { toast(tr('Save failed: {0}', e.message) + '\n' + tr('(this page has to be opened through python tools/serve.py)'), 6000); return false; }
+}
+async function previewMV() {
+  if (serialize(doc) !== savedText && !(await save())) return;
+  window.open(`${MV_URL}?t=${Math.max(0, lineRange()[0] - 1.5).toFixed(2)}`, '_blank');
+}
+
+/* ------------------------------------------------------------ UI */
+function render() {
+  if (!doc) return;
+  const ok = doc.lines.filter(l => l.status === ST_OK).length;
+  $('#prog').innerHTML = `${tr('{0} / {1} lines confirmed', ok, doc.lines.length)}<div class="bar"><i style="width:${ok / doc.lines.length * 100}%"></i></div>`;
+  $('#list').innerHTML = doc.lines.map((l, k) => {
+    const unc = l.rows.some(r => r.unc);
+    const txt = phrasesOf(l.rows).map(p => p.map(r => r.disp).join('')).join(' ');
+    const moved = l.from && !(l.from.length === 1 && l.from[0] === l.no) ? `<div class="o">${l.from.length ? tr('was {0}', l.from.join('+')) : tr('new')}</div>` : '';
+    return `<div class="li${k === li ? ' cur' : ''}" data-k="${k}"><span class="n">${String(l.no).padStart(2, '0')}${moved}</span><div><div class="t">${txt}</div><div class="s${l.status === ST_OK ? ' ok' : ''}${unc ? ' q' : ''}">${tr(l.status)}${unc ? ' · ' + tr('has uncertain morae') : ''} · ${fmtS(lineRange(k)[0])}</div></div></div>`;
+  }).join('');
+  const l = L(), ts = resolved(l);
+  $('#title').innerHTML = `${rubyHTML(tokensOf(l.rows))}<small>${tr('Line {0}', l.no)} · ${tr(l.status)}</small>`;
+  $('#sub').textContent = `${fmt(ts[0])} — ${fmt(l.end)}　·　${tr('{0} {0:mora|morae}', l.rows.length)}　·　${tr('speed {0}×', pref.rate)}　·　${pref.src === 'vox' ? tr('Vocals') : tr('Full mix')}　·　${tr('latency compensation {0} ms', Math.round(pref.lat * 1000))}`;
+  $('#morae').innerHTML = l.rows.map((r, i) => `<div class="m${i === cur ? ' cur' : ''}${r.new && i ? ' ph' : ''}${r.tied ? ' tied' : ''}${r.unc ? ' unc' : ''}${r.t != null ? ' done' : ''}" data-i="${i}"><div class="d">${r.disp || '&nbsp;'}</div><div class="k">${r.kana}</div><div class="tm">${r.tied ? '~ ' + fmtS(ts[i]) : fmtS(r.t)}</div></div>`).join('')
+    + `<div class="m end${cur >= l.rows.length ? ' cur' : ''}" data-i="${l.rows.length}"><div class="d">${tr('end')}</div><div class="k">.</div><div class="tm">${fmtS(l.end)}</div></div>`;
+  document.querySelectorAll('[data-rate]').forEach(b => b.classList.toggle('on', +b.dataset.rate === pref.rate));
+  $('#bSrc').textContent = pref.src === 'vox' ? tr('Vocals') : tr('Full mix');
+  drawWave();
+}
+let lastPlayIdx = -1;
+function highlightPlaying() {
+  if (!doc) return;
+  const t = act().currentTime, ts = resolved(L());
+  let k = -1; for (let i = 0; i < ts.length; i++) if (ts[i] <= t) k = i;
+  if (t > L().end || act().paused) k = -1;
+  if (k === lastPlayIdx) return;
+  lastPlayIdx = k;
+  document.querySelectorAll('.m').forEach((el, i) => el.classList.toggle('play', i === k));
+}
+
+/* ------------------------------------------------------------ waveform */
+const cv = $('#wave'), g = cv.getContext('2d'), sc = $('#scroll'), sg = sc.getContext('2d');
+let drag = null, pan = null, sdrag = null, mini = null, wasInside = false;
+const songEnd = () => (isFinite(A.mix.duration) && A.mix.duration) || (window.VOX ? VOX.level.length / VOX.fps : 0) || (doc ? doc.lines[doc.lines.length - 1].end + 5 : 60);
+// The range the waveform shows, [t0, t0 + span]: it never scrolls past either end of the song
+function setView(t0, span = view.t1 - view.t0) {
+  const end = songEnd();
+  span = clamp(span, .5, end + 2);
+  t0 = clamp(t0, -1, Math.max(-1, end + 1 - span));
+  view = { t0, t1: t0 + span };
+}
+function panBy(dt) { setView(view.t0 + dt); drawWave(); }
+// Backdrop of the whole-song strip (vocal level); redrawn only when the size changes
+function buildMini() {
+  mini = document.createElement('canvas'); mini.width = sc.width; mini.height = sc.height;
+  if (!window.VOX) return;
+  const m = mini.getContext('2d'), W = mini.width, H = mini.height, n = VOX.level.length;
+  m.fillStyle = 'rgba(108,184,255,.45)';
+  for (let x = 0; x < W; x++) {
+    let v = 0; for (let i = Math.floor(x / W * n), e = Math.floor((x + 1) / W * n); i < e; i++) if (VOX.level[i] > v) v = VOX.level[i];
+    const h = v / 255 * (H - 8); m.fillRect(x, H - 6 - h, 1, h);
+  }
+}
+function resize() {
+  const r = cv.getBoundingClientRect(); cv.width = r.width * devicePixelRatio; cv.height = r.height * devicePixelRatio;
+  const q = sc.getBoundingClientRect(); sc.width = q.width * devicePixelRatio; sc.height = q.height * devicePixelRatio;
+  buildMini(); drawWave();
+}
+function drawScroll() {
+  const W = sc.width, H = sc.height, dpr = devicePixelRatio, end = songEnd(), SX = t => t / end * W;
+  sg.fillStyle = '#17151f'; sg.fillRect(0, 0, W, H);
+  if (mini) sg.drawImage(mini, 0, 0);
+  doc.lines.forEach((l, k) => {          // where each line is: green = confirmed, grey = estimated, pink = current line
+    const [a, b] = lineRange(k);
+    sg.fillStyle = k === li ? '#ff7aa8' : l.status === ST_OK ? 'rgba(95,211,154,.85)' : 'rgba(154,148,173,.55)';
+    sg.fillRect(SX(a), H - 5 * dpr, Math.max(dpr, SX(b) - SX(a) - dpr), 4 * dpr);
+  });
+  const x0 = SX(Math.max(0, view.t0)), w = Math.max(4 * dpr, SX(Math.min(end, view.t1)) - x0);
+  sg.fillStyle = 'rgba(255,255,255,.13)'; sg.fillRect(x0, 0, w, H);
+  sg.strokeStyle = 'rgba(255,255,255,.75)'; sg.lineWidth = dpr; sg.strokeRect(x0 + dpr / 2, dpr / 2, w - dpr, H - dpr);
+  sg.fillStyle = '#5fd39a'; sg.fillRect(SX(act().currentTime) - dpr, 0, 2 * dpr, H);
+}
+const X = t => (t - view.t0) / (view.t1 - view.t0) * cv.width;
+const T = x => view.t0 + x / cv.width * (view.t1 - view.t0);
+function drawWave() {
+  if (!doc) return;
+  const W = cv.width, H = cv.height, dpr = devicePixelRatio, l = L(), ts = resolved(l);
+  g.fillStyle = '#100f16'; g.fillRect(0, 0, W, H);
+  if (window.VOX) {
+    const P = 60 / VOX.bpm, G = P / 4;
+    for (let k = Math.ceil((view.t0 - VOX.phase) / G); VOX.phase + k * G <= view.t1; k++) {
+      const x = X(VOX.phase + k * G), beat = k % 4 === 0, bar = beat && (((k / 4 - BAR) % 4) + 4) % 4 === 0;
+      g.fillStyle = bar ? 'rgba(255,255,255,.28)' : beat ? 'rgba(255,255,255,.14)' : 'rgba(255,255,255,.05)';
+      g.fillRect(Math.round(x), 0, bar ? 2 * dpr : dpr, H);
+    }
+    const f = VOX.fps, y0 = H * .62;
+    g.beginPath(); g.moveTo(0, y0);
+    for (let x = 0; x <= W; x += 2) { const i = Math.round(T(x) * f); g.lineTo(x, y0 - (VOX.level[i] || 0) / 255 * H * .5); }
+    for (let x = W; x >= 0; x -= 2) { const i = Math.round(T(x) * f); g.lineTo(x, y0 + (VOX.level[i] || 0) / 255 * H * .12); }
+    g.closePath(); g.fillStyle = 'rgba(108,184,255,.35)'; g.fill();
+    g.fillStyle = 'rgba(255,182,72,.85)';
+    for (let i = Math.max(0, Math.floor(view.t0 * f)); i <= view.t1 * f; i++) {
+      const v = VOX.flux[i] / 255; if (v < .08) continue;
+      g.fillRect(X(i / f) - dpr / 2, H - v * H * .22, dpr, v * H * .22);
+    }
+  }
+  // mora markers
+  g.font = `${13 * dpr}px "Yu Gothic UI", sans-serif`; g.textAlign = 'center'; g.textBaseline = 'top';
+  ts.forEach((t, i) => {
+    const r = l.rows[i], x = X(t), sel = i === cur;
+    g.strokeStyle = sel ? '#ff7aa8' : r.tied ? '#6cb8ff' : r.unc ? '#ffb648' : '#f1edf7';
+    g.lineWidth = (sel ? 3 : 1.5) * dpr;
+    g.setLineDash(r.tied ? [6 * dpr, 5 * dpr] : []);
+    g.beginPath(); g.moveTo(x, 22 * dpr); g.lineTo(x, H); g.stroke();
+    g.setLineDash([]);
+    g.fillStyle = sel ? '#ff7aa8' : '#f1edf7';
+    g.fillText(r.kana, x, (i % 2 ? 4 : 4) * dpr);
+    if (r.new && i) { g.fillStyle = '#ff7aa8'; g.fillRect(x - 1 * dpr, 20 * dpr, 2 * dpr, H); }
+  });
+  const xe = X(l.end); g.strokeStyle = cur >= l.rows.length ? '#ff7aa8' : '#9a94ad'; g.lineWidth = 2 * dpr; g.setLineDash([3 * dpr, 3 * dpr]);
+  g.beginPath(); g.moveTo(xe, 22 * dpr); g.lineTo(xe, H); g.stroke(); g.setLineDash([]);
+  g.fillStyle = '#9a94ad'; g.fillText(tr('end'), xe, 4 * dpr);
+  const xp = X(act().currentTime); g.fillStyle = '#5fd39a'; g.fillRect(xp - dpr, 0, 2 * dpr, H);
+  g.textAlign = 'left'; g.fillStyle = '#9a94ad'; g.font = `${11 * dpr}px Consolas, monospace`; g.fillText(fmt(act().currentTime), 6 * dpr, H - 16 * dpr);
+  g.textAlign = 'right'; g.fillText(`${fmt(Math.max(0, view.t0))} – ${fmt(view.t1)}`, W - 6 * dpr, H - 16 * dpr);
+  drawScroll();
+}
+function hitMarker(px) {
+  const l = L(), ts = resolved(l), cands = ts.map((t, i) => [Math.abs(X(t) - px), i]).concat([[Math.abs(X(l.end) - px), l.rows.length]]);
+  cands.sort((a, b) => a[0] - b[0]);
+  return cands[0][0] < 7 * devicePixelRatio ? cands[0][1] : -1;
+}
+cv.addEventListener('mousedown', e => {
+  const px = e.offsetX * devicePixelRatio, k = hitMarker(px);
+  if (k >= 0) { cur = k; snapshot(); drag = { k }; render(); return; }
+  pan = { x: e.clientX, px, t0: view.t0, moved: false };      // empty spot: drag = scroll sideways, release without moving = play from there
+});
+addEventListener('mousemove', e => {
+  if (sdrag) { setView(sdrag.t0 + (e.clientX - sdrag.x) / sdrag.w * songEnd()); drawWave(); return; }
+  if (pan) {
+    const dx = e.clientX - pan.x;
+    if (!pan.moved && Math.abs(dx) < 4) return;
+    pan.moved = true; cv.classList.add('panning');
+    setView(pan.t0 - dx * devicePixelRatio / cv.width * (view.t1 - view.t0)); drawWave();
+    return;
+  }
+  if (!drag) return;
+  const r = cv.getBoundingClientRect(), t = Math.round(T((e.clientX - r.left) * devicePixelRatio) * 100) / 100, l = L();
+  if (drag.k >= l.rows.length) l.end = t; else { l.rows[drag.k].t = t; l.rows[drag.k].tied = false; }
+  render();
+});
+addEventListener('mouseup', () => {
+  if (drag) { drag = null; changed(); }
+  if (pan) { const p = pan; pan = null; cv.classList.remove('panning'); if (!p.moved) play(T(p.px)); }
+  if (sdrag) { sdrag = null; sc.classList.remove('panning'); }
+});
+// Wheel: scrolling sideways (a left / right swipe on a trackpad, a mouse's horizontal wheel, Shift+wheel) = pan; scrolling vertically = zoom around the pointer
+function wheelPan(e) { return Math.abs(e.deltaX) > Math.abs(e.deltaY) ? e.deltaX : e.shiftKey ? e.deltaY : 0; }
+cv.addEventListener('wheel', e => {
+  e.preventDefault();
+  const span = view.t1 - view.t0, dx = wheelPan(e);
+  if (dx) { panBy(dx / 1000 * span); return; }
+  const c = T(e.offsetX * devicePixelRatio), k = Math.exp(e.deltaY / 600), ns = clamp(span * k, .5, songEnd() + 2);
+  setView(c - (c - view.t0) * ns / span, ns);
+  drawWave();
+}, { passive: false });
+// Whole-song strip: drag the bright box to scroll sideways; click outside the box and it jumps there; the wheel over the strip pans too
+sc.addEventListener('mousedown', e => {
+  const r = sc.getBoundingClientRect(), t = (e.clientX - r.left) / r.width * songEnd(), span = view.t1 - view.t0;
+  if (t < view.t0 || t > view.t1) setView(t - span / 2);
+  sdrag = { x: e.clientX, t0: view.t0, w: r.width }; sc.classList.add('panning');
+  drawWave(); e.preventDefault();
+});
+sc.addEventListener('wheel', e => { e.preventDefault(); panBy((wheelPan(e) || e.deltaY) / 1000 * (view.t1 - view.t0)); }, { passive: false });
+addEventListener('resize', resize);
+
+/* ------------------------------------------------------------ latency calibration: tap 16 times along with the drums of the intro */
+let cal = null;
+$('#bCal').onclick = () => { $('#calib').classList.add('show'); $('#calN').textContent = '0 / 16'; $('#calR').textContent = tr('Current compensation: {0} ms', Math.round(pref.lat * 1000)); };
+$('#calClose').onclick = () => { $('#calib').classList.remove('show'); cal = null; pause(); };
+$('#calGo').onclick = () => { cal = { taps: [], rate: 1 }; const r0 = pref.rate; pref.rate = 1; play(1.2, 14); pref.rate = r0; act().playbackRate = 1; $('#calN').textContent = '0 / 16'; };
+function calTap(ts) {
+  const t = mediaAt(ts), P = 60 / VOX.bpm, b = Math.round((t - VOX.phase) / P), d = t - (VOX.phase + b * P);
+  cal.taps.push(d); $('#calN').textContent = `${cal.taps.length} / 16`;
+  if (cal.taps.length >= 16) {
+    const s = cal.taps.slice(2).sort((a, b) => a - b), med = s[Math.floor(s.length / 2)];
+    pref.lat = Math.round(med * 1000) / 1000; savePref(); pause(); act().playbackRate = pref.rate;
+    $('#calR').textContent = med >= 0 ? tr('Your presses are {0} ms late on average; that is now the latency compensation', Math.round(med * 1000)) : tr('Your presses are {0} ms early on average; that is now the latency compensation', -Math.round(med * 1000));
+    cal = null; render();
+  }
+}
+
+/* ------------------------------------------------------------ keyboard */
+addEventListener('keydown', e => {
+  if (!doc) return;
+  if (ed) {                                                   // while a line is being edited: only Esc / Ctrl+Enter are handled, every other key is typing
+    if (e.key === 'Escape') { e.preventDefault(); closeEditor(); }
+    else if (e.key === 'Enter' && (e.ctrlKey || e.metaKey) && !e.isComposing) { e.preventDefault(); applyEditor(); }
+    return;
+  }
+  if (e.target && e.target.tagName === 'INPUT') {            // typing a number into the "Shift" box: keys are not treated as shortcuts
+    if (e.key === 'Enter' || e.key === 'Escape') e.target.blur();
+    return;
+  }
+  if (cal) { if (e.code === 'KeyJ' || e.code === 'KeyF') { e.preventDefault(); calTap(e.timeStamp); } return; }
+  const k = e.key, l = L();
+  if ((e.ctrlKey || e.metaKey) && k.toLowerCase() === 's') { e.preventDefault(); save(); return; }
+  if ((e.ctrlKey || e.metaKey) && k.toLowerCase() === 'z') { e.preventDefault(); e.shiftKey ? doRedo() : doUndo(); return; }
+  if ((e.ctrlKey || e.metaKey) && k.toLowerCase() === 'y') { e.preventDefault(); doRedo(); return; }
+  if (e.ctrlKey || e.metaKey || e.altKey) return;
+  if (e.code === 'Space') { e.preventDefault(); act().paused ? play(null) : pause(); }
+  else if (e.code === 'KeyJ' || e.code === 'KeyF') { e.preventDefault(); if (!e.repeat) tap(e.timeStamp); }
+  else if (e.code === 'KeyK') tie();
+  else if (e.code === 'KeyR') playLine();
+  else if (e.code === 'KeyQ') snapOnset();
+  else if (e.code === 'KeyV') toggleSrc();
+  else if (e.code === 'KeyP') previewMV();
+  else if (e.code === 'KeyE') { e.preventDefault(); openEditor('edit'); }
+  else if (k === '?') toggleUnc();
+  else if (k === 'Backspace') { e.preventDefault(); cur = Math.max(0, cur - 1); render(); }
+  else if (k === 'ArrowLeft' && e.shiftKey) { e.preventDefault(); panBy(-(view.t1 - view.t0) / 2); }
+  else if (k === 'ArrowRight' && e.shiftKey) { e.preventDefault(); panBy((view.t1 - view.t0) / 2); }
+  else if (k === 'ArrowLeft') { e.preventDefault(); cur = Math.max(0, cur - 1); render(); }
+  else if (k === 'ArrowRight') { e.preventDefault(); cur = Math.min(l.rows.length, cur + 1); render(); }
+  else if (k === 'ArrowUp') { e.preventDefault(); gotoLine(li - 1); }
+  else if (k === 'ArrowDown') { e.preventDefault(); gotoLine(li + 1); }
+  else if (k === ',' || k === '<') nudge(e.shiftKey || k === '<' ? -.05 : -.01);
+  else if (k === '.' || k === '>') nudge(e.shiftKey || k === '>' ? .05 : .01);
+  else if (k === 'Enter') { e.preventDefault(); confirmLine(); }
+  else if (e.code === 'BracketLeft') { e.preventDefault(); e.shiftKey ? shiftAll(-1) : shiftLine(-1); }
+  else if (e.code === 'BracketRight') { e.preventDefault(); e.shiftKey ? shiftAll(1) : shiftLine(1); }
+  else if (/^[1-4]$/.test(k)) setRate([.5, .6, .75, 1][+k - 1]);
+});
+document.addEventListener('click', e => {
+  if (ed) return;
+  const li_ = e.target.closest('.li'); if (li_) { gotoLine(+li_.dataset.k); return; }
+  const m = e.target.closest('.m'); if (m) { cur = +m.dataset.i; render(); const ts = resolved(L()); const t = cur < ts.length ? ts[cur] : L().end; play(t - .6, t + .5); }
+});
+$('#bPlay').onclick = () => (act().paused ? play(null) : pause());
+$('#bLine').onclick = playLine;
+$('#bSrc').onclick = toggleSrc;
+$('#bOk').onclick = confirmLine;
+$('#bSave').onclick = save;
+$('#bPrev').onclick = previewMV;
+$('#bEdit').onclick = () => openEditor('edit');
+$('#bInsert').onclick = () => openEditor('insert');
+$('#bMerge').onclick = mergeNext;
+$('#bSplit').onclick = splitHere;
+$('#bDelete').onclick = deleteLine;
+$('#edCancel').onclick = closeEditor;
+$('#edApply').onclick = applyEditor;
+$('#edText').addEventListener('input', () => { retext($('#edText').value); renderCells(); renderEdInfo(); });
+$('#edCells').addEventListener('input', e => { const i = e.target.dataset.i; if (i == null) return; const c = ed.cells[+i]; c.r = e.target.value; c.guess = false; e.target.closest('.cell').classList.remove('guess'); renderEdInfo(); });
+$('#edCells').addEventListener('click', e => {
+  const b = e.target.closest('button'); if (!b) return;
+  if (b.dataset.join != null) {              // join with the character to the right: the readings are run together, then the user corrects it to the reading of the whole word
+    const j = +b.dataset.join, nx = ed.cells[j + 1];
+    let i = j; while (i > 0 && ed.cells[i - 1].k === 'c' && ed.cells[i - 1].join) i--;
+    ed.cells[i].r = (ed.cells[i].r || '') + (nx.r || ''); nx.r = ''; ed.cells[j].join = true;
+  } else if (b.dataset.split != null) {      // split: the reading stays on the first character; the ones after it have to be filled in again
+    let i = +b.dataset.split; while (ed.cells[i].join) { ed.cells[i].join = false; i++; if (ed.cells[i].k === 'c' && isKana(ed.cells[i].ch)) ed.cells[i].r = ed.cells[i].ch; }
+  }
+  renderCells(); renderEdInfo();
+});
+$('#bLineEarly').onclick = () => shiftLine(-1);
+$('#bLineLate').onclick = () => shiftLine(1);
+$('#bAllEarly').onclick = () => shiftAll(-1);
+$('#bAllLate').onclick = () => shiftAll(1);
+try { const v = localStorage.getItem('timing-shift'); if (v) $('#shiftVal').value = v; } catch {}
+$('#shiftVal').addEventListener('change', () => { try { localStorage.setItem('timing-shift', $('#shiftVal').value); } catch {} });
+document.querySelectorAll('[data-rate]').forEach(b => (b.onclick = () => setRate(+b.dataset.rate)));
+Object.values(A).forEach(a => a.addEventListener('timeupdate', () => { if (a === act() && stopAt != null && a.currentTime >= stopAt) pause(); }));   // rAF doesn't run while the tab is in the background; this is the fallback
+addEventListener('beforeunload', e => { if (doc && serialize(doc) !== savedText) { e.preventDefault(); e.returnValue = ''; } });
+
+/* ------------------------------------------------------------ startup */
+(async () => {
+  const proj = await (await fetch('/__project', { cache: 'no-store' })).json();
+  MV_URL = `../${proj.current}/index.html`; BAR = proj.bar_offset || 0; LS_DRAFT += ':' + proj.slug;
+  $('#h1').textContent = `${proj.title} · ${tr('Mora timing')}`; document.title = `${tr('Lyric timing')} · ${proj.title}`;
+  const res = await fetch(TIMING_URL, { cache: 'no-store' });
+  if (!res.ok) throw new Error(tr('lyrics/timing.txt does not exist yet (run python lyric-tool/lyrics.py to generate it)'));
+  const text = await res.text();
+  doc = parseTiming(text);
+  savedText = serialize(doc); savedCount = doc.lines.length;
+  try {
+    const d = JSON.parse(localStorage.getItem(LS_DRAFT) || 'null');
+    if (d && d.text !== savedText) {
+      // keep a separate, timestamped copy: whatever happens next (new edits, another reload), this draft is still there
+      const arch = LS_DRAFT + ':' + d.at;
+      try { localStorage.setItem(arch, JSON.stringify(d)); } catch {}
+      $('#draftMsg').textContent = tr('This browser holds a draft that was never saved to the project ({0}). After restoring it, press Ctrl+S to save it to the project.', new Date(d.at).toLocaleString());
+      $('#draft').classList.add('show');
+      $('#bRestore').onclick = () => {
+        doc = parseTiming(d.text);
+        if (doc.lines.length !== savedCount) doc.lines.forEach(l => (l.from = null));     // the draft has a different number of lines: the original numbers can no longer be matched
+        $('#draft').classList.remove('show'); gotoLine(li); changed();
+      };
+      $('#bDiscard').onclick = () => { if (!confirm(tr('Discard this draft? It can\'t be brought back.'))) return; try { localStorage.removeItem(LS_DRAFT); localStorage.removeItem(arch); } catch {} $('#draft').classList.remove('show'); };
+    }
+  } catch {}
+  A.vox.playbackRate = A.mix.playbackRate = pref.rate;
+  const first = doc.lines.findIndex(l => l.status !== ST_OK);
+  resize();
+  gotoLine(first < 0 ? 0 : first);
+  changed(false);
+  requestAnimationFrame(tick);
+})().catch(e => { document.body.innerHTML = `<pre style="padding:20px;color:#ff9a9a">${tr('Could not read the timeline: {0}', e.message)}\n${tr('Run python tools/serve.py, then open http://127.0.0.1:8600/lyric-tool/')}</pre>`; });
+</script>
+</body>
+</html>

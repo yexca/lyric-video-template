@@ -1,0 +1,19 @@
+# The user's raw material and the tools' non-text output: not in git (only the README files are kept)
+/ref/*
+!/ref/README.md
+!/ref/README.zh-cn.md
+/data/*
+!/data/README.md
+!/data/README.zh-cn.md
+
+# Machine-specific config (export directory, temp directory)
+/project.local.json
+
+# Automatic backups of the timeline (the timing tool keeps one per save; for long-term history use git)
+/lyrics/backup/
+
+__pycache__/
+*.pyc
+node_modules/
+.DS_Store
+Thumbs.db

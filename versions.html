@@ -1,0 +1,86 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title data-i18n>All versions</title>
+  <style>
+    * { box-sizing: border-box; }
+    body { margin: 0; background: #12151b; color: #eee; font-family: system-ui, "Microsoft YaHei", sans-serif; }
+    header { padding: 14px 20px; display: flex; flex-wrap: wrap; align-items: center; gap: 12px; }
+    h1 { font-size: 18px; margin: 0 12px 0 0; }
+    select, button { font: inherit; color: #eee; background: #242b36; border: 1px solid #485266; border-radius: 6px; padding: 7px 12px; }
+    button { cursor: pointer; } button:disabled { opacity: .35; cursor: default; }
+    a { color: #a9caff; } #position { font-size: 13px; color: #aab2c0; }
+    .tools { margin-left: auto; display: flex; align-items: center; gap: 16px; font-size: 14px; }
+    p { margin: 0; padding: 0 20px 12px; color: #aab2c0; font-size: 13px; }
+    iframe { display: block; width: 100%; height: calc(100dvh - 106px); min-height: 350px; border: 0; background: #000; }
+  </style>
+</head>
+<body>
+  <header>
+    <h1 id="h1" data-i18n>Versions</h1>
+    <button id="previous" aria-label="Previous version" data-i18n="text aria-label">← Previous</button>
+    <select id="version" aria-label="Choose a version" data-i18n="aria-label"></select>
+    <button id="next" aria-label="Next version" data-i18n="text aria-label">Next →</button>
+    <span id="position"></span>
+    <a id="standalone" target="_blank" rel="noopener" data-i18n>Open this version on its own ↗</a>
+    <span class="tools"><a href="lyric-tool/" data-i18n>Lyric timing</a><a href="pic-tool/" data-i18n>Images</a><select data-i18n-lang aria-label="Language"></select></span>
+  </header>
+  <p data-i18n>Pick a version, then click the picture to play. Switching versions stops playback; open a version on its own for a larger picture.</p>
+  <iframe id="player" title="Video player" data-i18n="title" allow="autoplay; fullscreen" allowfullscreen></iframe>
+  <script src="tools/i18n.js"></script>
+  <script>
+    // UI text is always written in English (the English is the source string and the lookup key); each other language adds a dictionary here (see tools/i18n.js)
+    I18N.add('zh-cn', '简体中文', {
+      'All versions': '各版本播放',
+      'Versions': '版本播放',
+      '← Previous': '← 上一个',
+      'Previous version': '上一个版本',
+      'Choose a version': '选择版本',
+      'Next →': '下一个 →',
+      'Next version': '下一个版本',
+      'Open this version on its own ↗': '单独打开此版本 ↗',
+      'Lyric timing': '歌词打点',
+      'Images': '图片总览',
+      'Pick a version, then click the picture to play. Switching versions stops playback; open a version on its own for a larger picture.':
+        '选择版本后，在画面中点击播放。切换版本会停止当前播放；单独打开可获得更大的画面。',
+      'Video player': '视频播放',
+      '{0} (current)': '{0}（当前）',
+      'template (empty template)': 'template（空模板）',
+      'Can\'t read the version list: run python tools/serve.py, then open http://127.0.0.1:8600/':
+        '读不到版本列表：请运行 python tools/serve.py，然后打开 http://127.0.0.1:8600/',
+    });
+    I18N.apply();
+
+    // The version list comes from /__project in tools/serve.py (it scans the root for v<line>_<iteration> folders); this file never needs editing by hand
+    const select = document.getElementById('version');
+    const previous = document.getElementById('previous'), next = document.getElementById('next');
+    let versions = [];
+    function show() {
+      const v = select.value, i = versions.indexOf(v);
+      document.getElementById('player').src = `${v}/`;
+      document.getElementById('standalone').href = `${v}/`;
+      document.getElementById('position').textContent = `${i + 1} / ${versions.length}`;
+      previous.disabled = i <= 0; next.disabled = i >= versions.length - 1;
+      history.replaceState(null, '', `?version=${v}`);
+    }
+    select.onchange = show;
+    previous.onclick = () => { select.value = versions[versions.indexOf(select.value) - 1]; show(); };
+    next.onclick = () => { select.value = versions[versions.indexOf(select.value) + 1]; show(); };
+    fetch('/__project', { cache: 'no-store' }).then(r => r.json()).then(proj => {
+      versions = ['template', ...proj.versions];
+      document.getElementById('h1').textContent = `${proj.title} · ${tr('Versions')}`;
+      document.title = `${proj.title} · ${tr('All versions')}`;
+      for (const v of versions) {
+        const option = document.createElement('option');
+        option.value = v; option.textContent = v === proj.current ? tr('{0} (current)', v) : v === 'template' ? tr('template (empty template)') : v;
+        select.append(option);
+      }
+      const requested = new URLSearchParams(location.search).get('version');
+      select.value = versions.includes(requested) ? requested : versions.includes(proj.current) ? proj.current : versions[versions.length - 1];
+      show();
+    }).catch(() => { document.querySelector('p').textContent = tr('Can\'t read the version list: run python tools/serve.py, then open http://127.0.0.1:8600/'); });
+  </script>
+</body>
+</html>
