@@ -47,10 +47,10 @@ function mix(a, b, k) {
   return '#' + A.map((v, i) => Math.round(lerp(v, B[i], k2)).toString(16).padStart(2, '0')).join('');
 }
 
-/* ---------- Palette (each work changes it in its own version) ---------- */
+/* ---------- Palette: neutral greys only, so the engine suggests no look. Each work defines its own colours in its own
+ * version (add keys here or keep a palette of its own); the engine itself uses only bg / fg / mid / light / white. ---------- */
 const C = {
-  paper: '#f3ecdf', cream: '#fbf7ef', ink: '#1a1c33', night: '#0b0f26', navy: '#18204a', indigo: '#2a2f6e',
-  red: '#e2433b', orange: '#ff8a3d', amber: '#ffc06a', blue: '#4aa6ea', violet: '#7a4fb0', magenta: '#d8508f', white: '#ffffff',
+  bg: '#ffffff', fg: '#111111', dark: '#3a3a3a', mid: '#8a8a8a', light: '#e4e4e4', white: '#ffffff', black: '#000000',
 };
 
 /* ---------- Audio analysis (tools/analyze.py → data/derived/analysis.js) ----------
@@ -139,7 +139,7 @@ function txt(c, s, x, y, o = {}) {
   if (o.rot) { c.translate(x, y); c.rotate(o.rot); x = y = 0; }
   if (o.sh) { c.fillStyle = o.sh; c.fillText(s, x + (o.shx ?? o.size * .06), y + (o.shy ?? o.size * .06)); }
   if (o.stroke) { c.lineJoin = 'round'; c.lineWidth = o.sw || 6; c.strokeStyle = o.stroke; c.strokeText(s, x, y); }
-  c.fillStyle = o.color || C.ink;
+  c.fillStyle = o.color || C.fg;
   c.fillText(s, x, y);
   c.restore();
 }
@@ -176,28 +176,10 @@ for (let k = 0; k < 4; k++) {
   g.putImageData(im, 0, 0);
   GRAIN.push(cv);
 }
-// Paper texture: low-frequency mottling + fibres. Stored as "dark brown + alpha", so plain source-over amounts to multiplying by the paper colour (which likewise avoids the multiply blend)
-const PAPER = (() => {
-  const cv = canvas(960, 540), g = cv.getContext('2d'), im = g.createImageData(960, 540);
-  for (let y = 0; y < 540; y++) for (let x = 0; x < 960; x++) {
-    const n = (noise(x / 90, 7 + Math.floor(y / 90)) * .5 + noise(x / 17 + y / 23, 9) * .3 + hash(x + y * 960, 3) * .5);
-    const v = 236 + n * 14;
-    const i = (y * 960 + x) * 4;
-    im.data[i] = 70; im.data[i + 1] = 56; im.data[i + 2] = 36; im.data[i + 3] = clamp(1 - v / 255) * 255;
-  }
-  g.putImageData(im, 0, 0);
-  g.globalAlpha = .07; g.strokeStyle = '#6a5a40'; g.lineWidth = .6;
-  for (let i = 0; i < 700; i++) {
-    const x = hash(i, 11) * 960, y = hash(i, 12) * 540, a = hash(i, 13) * TAU, l = 4 + hash(i, 14) * 18;
-    g.beginPath(); g.moveTo(x, y); g.quadraticCurveTo(x + Math.cos(a + .6) * l * .5, y + Math.sin(a + .6) * l * .5, x + Math.cos(a) * l, y + Math.sin(a) * l); g.stroke();
-  }
-  return cv;
-})();
 // Textures converted to ImageBitmaps (they stay in GPU memory; drawing a canvas directly re-uploads it every frame)
 const TEX = {};
 async function prepareTextures() {
   try {
-    TEX.paper = await createImageBitmap(PAPER);
     TEX.grain = await Promise.all(GRAIN.map(g => createImageBitmap(g)));
   } catch (e) { console.warn('ImageBitmap unavailable', e); }
 }

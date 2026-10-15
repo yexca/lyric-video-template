@@ -160,7 +160,7 @@ button.on { background: #4a2740; border-color: var(--acc); }
       <kbd>Backspace</kbd> go back one mora and tap it again　<kbd>←</kbd><kbd>→</kbd> select a mora　<kbd>,</kbd><kbd>.</kbd> nudge ±10 ms (with <kbd>Shift</kbd> ±50 ms)　<kbd>Q</kbd> snap to the nearest vocal onset　<kbd>?</kbd> mark as uncertain<br>
       <kbd>[</kbd><kbd>]</kbd> move the whole line earlier / later (by the seconds in the “Shift” box)　<kbd>Shift</kbd>+<kbd>[</kbd><kbd>]</kbd> move every line earlier / later<br>
       <kbd>E</kbd> edit this line's text and readings (merge, split, add and delete are in the “Line” row)　<kbd>Enter</kbd> confirm this line and go to the next　<kbd>↑</kbd><kbd>↓</kbd> change line　<kbd>1</kbd>–<kbd>4</kbd> speed 0.5/0.6/0.75/1　<kbd>V</kbd> vocals / full mix　<kbd>Ctrl+Z</kbd> undo　<kbd>Ctrl+S</kbd> save　<kbd>P</kbd> view this line in the video<br>
-      Waveform: click an empty spot to play from there; drag a vertical line to change its time; scroll to zoom. Thin lines = 16th notes, bright lines = beats, thick lines = bars. The short ticks along the bottom show vocal onset strength.<br>
+      Waveform: click an empty spot to play from there; drag a vertical line to change its time — the others stay put until it reaches them, then it pushes them along ahead of it; scroll to zoom. Thin lines = 16th notes, bright lines = beats, thick lines = bars. The short ticks along the bottom show vocal onset strength.<br>
       Scrolling sideways: drag the bright box in the whole-song strip under the waveform (click outside the box and it jumps there); or hold an empty spot of the waveform and drag left / right; or use a horizontal wheel / <kbd>Shift</kbd>+wheel; <kbd>Shift</kbd>+<kbd>←</kbd><kbd>→</kbd> scrolls half a screen. When the playhead runs off the right edge the view pages forward by itself. The small bars at the bottom of the strip are the lines (green = confirmed, pink = current line).
     </div>
   </main>
@@ -179,7 +179,7 @@ button.on { background: #4a2740; border-color: var(--acc); }
   <div id="edPrev"></div>
   <div class="lab" data-i18n>Text (just type; a space = phrase break — phrases can be laid out separately on screen)</div>
   <input id="edText" type="text" autocomplete="off" spellcheck="false">
-  <div class="lab" data-i18n>Readings (kana under each kanji; kana themselves rarely need touching. When two or more characters share one reading — 今日 read きょう — click “join” to connect them)</div>
+  <div class="lab" id="edLab"></div>
   <div id="edCells"></div>
   <div id="edInfo"></div>
   <div class="btns"><span class="hint" data-i18n>Ctrl+Enter apply　Esc cancel</span><button id="edCancel" data-i18n>Cancel</button><button id="edApply" data-i18n>Apply</button></div>
@@ -263,6 +263,15 @@ function resolved(L) {
 const OPEN = '「『（(', CLOSE = '」』）)？！、。?!', MERGE = 'ゃゅょぁぃぅぇぉゎャュョァィゥェォヮっッー';
 const isKana = ch => /^[\u3041-\u3096\u30a1-\u30fa\u30fc]$/.test(ch);
 const isPunct = ch => OPEN.includes(ch) || CLOSE.includes(ch);
+const kanaStr = s => s.length > 0 && [...s].every(isKana);
+// A reading → its units (one unit = one mora = one tap). A space in a reading always splits it; each piece is then
+//   UNITS 'kana' (Japanese): split again per kana if it is all kana (small kana, っ and ー merge back later, in moraeOf); any other piece (pinyin, a Latin syllable) is one unit
+//   UNITS 'whole': one unit as it is — a character's reading is not split unless a space is typed into it
+// (reading_units in project.json, set at startup; same as units_of in lyrics.py)
+let UNITS = 'kana';
+const unitsOf = r => r.trim().split(/\s+/).filter(Boolean).flatMap(p => (UNITS === 'kana' && kanaStr(p) ? [...p] : [p]));
+// Inverse: append unit b to reading a. Kana run straight on when they would split per kana anyway; anything else needs a space to stay separate
+const joinUnits = (a, b) => (!a ? b : UNITS === 'kana' && kanaStr(a.split(' ').pop()) && kanaStr(b) ? a + b : a + ' ' + b);
 // the morae of one line → tokens: { d display, r reading } / { p punctuation } / null for a phrase boundary
 function tokensOf(rows) {
   const toks = [];
@@ -272,16 +281,16 @@ function tokensOf(rows) {
     const head = [], tail = [], merged = [];
     while (d.length && OPEN.includes(d[0])) head.push(d.shift());
     while (d.length && CLOSE.includes(d[d.length - 1])) tail.unshift(d.pop());
-    while (k.length > 1 && d.length && MERGE.includes(d[d.length - 1]) && d[d.length - 1] === k[k.length - 1]) { merged.unshift(d.pop()); k.pop(); }
+    while (kanaStr(row.kana) && k.length > 1 && d.length && MERGE.includes(d[d.length - 1]) && d[d.length - 1] === k[k.length - 1]) { merged.unshift(d.pop()); k.pop(); }
     head.forEach(c => toks.push({ p: c }));
     if (d.length) toks.push({ d: d.join(''), r: k.join('') });
-    else { const last = toks.findLast(t => t && t.d != null); if (last) last.r += k.join(''); else toks.push({ d: k.join(''), r: k.join('') }); }
+    else { const last = toks.findLast(t => t && t.d != null); if (last) last.r = joinUnits(last.r, k.join('')); else toks.push({ d: k.join(''), r: k.join('') }); }
     merged.forEach(c => toks.push({ d: c, r: c }));
     tail.forEach(c => toks.push({ p: c }));
   });
   return toks;
 }
-// tokens → morae (disp / kana / new): one kana per mora; small kana, sokuon and the long-vowel mark merge into the previous mora; punctuation attaches to the neighbouring character
+// tokens → morae (disp / kana / new): one reading unit per mora (see unitsOf); small kana, sokuon and the long-vowel mark merge into the previous mora; punctuation attaches to the neighbouring character
 function moraeOf(toks) {
   const phrases = [[]];
   let pending = '';
@@ -289,7 +298,7 @@ function moraeOf(toks) {
     if (t === null) { phrases.push([]); continue; }
     const ph = phrases[phrases.length - 1];
     if (t.p != null) { if (OPEN.includes(t.p) || !ph.length) pending += t.p; else ph[ph.length - 1].disp += t.p; continue; }
-    [...t.r].forEach((k, j) => { ph.push({ disp: j === 0 ? pending + t.d : '', kana: k }); if (j === 0) pending = ''; });
+    unitsOf(t.r).forEach((k, j) => { ph.push({ disp: j === 0 ? pending + t.d : '', kana: k }); if (j === 0) pending = ''; });
   }
   const rows = [];
   for (const ph of phrases) {
@@ -306,7 +315,7 @@ const esc = s => s.replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&
 // how readings are shown: the reading above the kanji, one separator between phrases
 function rubyHTML(toks, sep = '　') {
   return toks.map(t => t === null ? sep : t.p != null ? esc(t.p)
-    : t.d === t.r ? esc(t.d) : `<ruby>${esc(t.d)}<rt>${t.r ? esc(t.r) : '<span class="miss">？</span>'}</rt></ruby>`).join('');
+    : t.d === t.r ? esc(t.d) : `<ruby>${esc(t.d)}<rt>${t.r ? esc(t.r.trim().replace(/\s+/g, '·')) : '<span class="miss">？</span>'}</rt></ruby>`).join('');
 }
 
 /* ------------------------------------------------------------ state */
@@ -485,12 +494,21 @@ function toksOfCells(cells) {
   while (toks.length && toks[toks.length - 1] === null) toks.pop();
   return toks;
 }
-// Readings already used somewhere in the song: a newly typed kanji gets its first guess from them (blue = guessed, needs checking)
+// Readings already used somewhere in the song: a newly typed kanji gets its first guess from them (blue = guessed, needs checking).
+// selfHan: most kanji / hanzi in the song are read as themselves (lyrics where one character is one unit, e.g. Chinese) — a new one then reads as itself too
+const isHan = ch => /^[㐀-鿿豈-﫿]$/.test(ch);
+const isWordCh = ch => /^[A-Za-z0-9À-ɏ'’]$/.test(ch);     // characters of a Latin word / a number: a run of them is one word with one reading
 function readingDict() {
   const dict = new Map();
-  for (const l of doc.lines) for (const t of tokensOf(l.rows)) if (t && t.d != null && t.d !== t.r && !dict.has(t.d)) dict.set(t.d, t.r);
-  return dict;
+  let self = 0, other = 0;
+  for (const l of doc.lines) for (const t of tokensOf(l.rows)) {
+    if (!t || t.d == null) continue;
+    if (isHan(t.d)) t.d === t.r ? self++ : other++;
+    if (t.d !== t.r && !dict.has(t.d)) dict.set(t.d, t.r);
+  }
+  return { dict, selfHan: self > other };
 }
+const defaultReading = ch => (isKana(ch) || (isHan(ch) && ed.selfHan) ? ch : '');
 // After the text changes: untouched characters keep their readings and joins; new characters are guessed from the dictionary
 function retext(text) {
   const chars = [...text.replace(/\u3000/g, ' ')], old = ed.cells, n = old.length, m = chars.length;
@@ -503,6 +521,16 @@ function retext(text) {
     else { const ch = chars[j]; cells.push(ch === ' ' ? { k: 'sp', ch } : isPunct(ch) ? { k: 'p', ch } : { k: 'c', ch, r: isKana(ch) ? ch : '', join: false, fresh: true }); src.push(-1); j++; }
   }
   cells.forEach((c, x) => { if (c.join && !(cells[x + 1] && cells[x + 1].k === 'c' && src[x] >= 0 && src[x + 1] === src[x] + 1)) c.join = false; });
+  for (let x = 0; x < cells.length; x++) {          // a Latin word / number that was typed or changed: one cell group, read as in the dictionary or else as the word itself (one unit)
+    if (cells[x].k !== 'c' || !isWordCh(cells[x].ch)) continue;
+    let e = x; while (cells[e + 1] && cells[e + 1].k === 'c' && isWordCh(cells[e + 1].ch)) e++;
+    const run = cells.slice(x, e + 1);
+    if (run.some(c => c.fresh)) {
+      const w = run.map(c => c.ch).join('');
+      run.forEach((c, y) => Object.assign(c, { r: y ? '' : ed.dict.get(w) || w, join: y < run.length - 1, guess: true, fresh: false }));
+    }
+    x = e;
+  }
   for (let x = 0; x < cells.length; x++) {          // new kanji: look for the longest word in the dictionary first, then the single character
     if (!cells[x].fresh || cells[x].r) continue;
     let done = false;
@@ -512,15 +540,17 @@ function retext(text) {
       const r = ed.dict.get(run.map(c => c.ch).join(''));
       if (r) { run.forEach((c, y) => { c.join = y + 1 < len; c.guess = true; }); cells[x].r = r; done = true; }
     }
+    if (!done && (cells[x].r = defaultReading(cells[x].ch))) cells[x].guess = true;
   }
   ed.cells = cells;
 }
 function openEditor(mode) {
   if (!doc) return;
   pause();
-  ed = { mode, dict: readingDict(), cells: mode === 'edit' ? cellsOf(tokensOf(L().rows)) : [] };
+  ed = { mode, ...readingDict(), cells: mode === 'edit' ? cellsOf(tokensOf(L().rows)) : [] };
   $('#edHead').textContent = mode === 'edit' ? tr('Edit text and readings · line {0}', L().no) : tr('Add a line after line {0}', L().no);
   $('#edText').value = ed.cells.map(c => c.ch).join('');
+  $('#edLab').textContent = UNITS === 'whole' ? tr('Readings (one under each character: pinyin, kana, the character itself — any text. A whole reading is one tap; type a space inside it to split it into several taps (hello → hel lo). When two or more characters share one reading, click “join” to connect them)') : tr('Readings (kana under each kanji: one tap per kana; kana themselves rarely need touching. Any other reading — pinyin, a Latin syllable — is one tap; a space inside a reading splits it into several. When two or more characters share one reading — 今日 read きょう — click “join” to connect them)');
   $('#editor').classList.add('show');
   renderCells(); renderEdInfo();
   setTimeout(() => $('#edText').focus(), 0);
@@ -542,28 +572,29 @@ function renderCells() {
   }
   $('#edCells').innerHTML = html || `<span style="color:var(--dim)">${tr('Type the text above first')}</span>`;
 }
-const kanaOnly = r => r.length > 0 && [...r].every(isKana);
+// A usable reading: at least one unit; no [ ] { } (they would break the kana.txt notation) and no unit that is just "." (that row would read as the line end)
+const okReading = r => { const u = unitsOf(r || ''); return u.length > 0 && !/[[\]{}]/.test(r) && !u.includes('.'); };
 function edResult() {          // → { toks, rows, err }
-  const toks = toksOfCells(ed.cells), bad = toks.filter(t => t && t.d != null && !kanaOnly(t.r));
+  const toks = toksOfCells(ed.cells), bad = toks.filter(t => t && t.d != null && !okReading(t.r));
   const rows = bad.length ? [] : moraeOf(toks);
   let err = '';
   if (!toks.some(t => t && t.d != null)) err = tr('The line is empty');
-  else if (bad.length) err = tr('{0} reading{0:|s} still missing or not kana: {1}', bad.length, bad.map(t => t.d).join(tr(', @@in a list')));
+  else if (bad.length) err = tr('{0} reading{0:|s} still missing or not usable: {1}', bad.length, bad.map(t => t.d).join(tr(', @@in a list')));
   else if (MERGE.includes(rows[0].kana[0])) err = tr('A line can\'t start with a small kana, a sokuon (っ) or a long-vowel mark (ー)');
   return { toks, rows, err };
 }
 function renderEdInfo() {
   const { toks, rows, err } = edResult();
   $('#edPrev').innerHTML = rubyHTML(toks, '<span class="br">/</span>') || '&nbsp;';
-  document.querySelectorAll('#edCells .cell[data-i]').forEach(el => el.classList.toggle('bad', !kanaOnly((ed.cells[+el.dataset.i].r || '').trim())));
+  document.querySelectorAll('#edCells .cell[data-i]').forEach(el => el.classList.toggle('bad', !okReading(ed.cells[+el.dataset.i].r)));
   let info = '';
   if (err) info = `<span class="w">${esc(err)}</span>`;
   else if (ed.mode === 'edit') {
     const { kept } = carryTiming(L(), rows);
-    info = `<b>${tr('{0} {0:mora|morae}', rows.length)}</b>${tr(' (was {0}): ', L().rows.length)}${rows.map(r => r.kana).join(' ')}\n`
+    info = `<b>${tr('{0} {0:mora|morae}', rows.length)}</b>${tr(' (was {0}): ', L().rows.length)}${rows.map(r => r.kana).join(' · ')}\n`
       + (kept === rows.length && rows.length === L().rows.length ? tr('The morae are unchanged; every time is kept.')
         : tr('Times kept for {0} {0:mora|morae}; the other {1} {1:is|are} spread evenly between the neighbours and marked “?”. The line goes back to “estimated” — tap it again after applying.', kept, rows.length - kept));
-  } else info = `<b>${tr('{0} {0:mora|morae}', rows.length)}</b>${tr(': ')}${rows.map(r => r.kana).join(' ')}\n${tr('The new line goes into the gap after line {0} with evenly spread times; tap it after applying.', L().no)}`;
+  } else info = `<b>${tr('{0} {0:mora|morae}', rows.length)}</b>${tr(': ')}${rows.map(r => r.kana).join(' · ')}\n${tr('The new line goes into the gap after line {0} with evenly spread times; tap it after applying.', L().no)}`;
   $('#edInfo').innerHTML = info;
   $('#edApply').disabled = !!err;
 }
@@ -757,7 +788,7 @@ function resize() {
 function drawScroll() {
   const W = sc.width, H = sc.height, dpr = devicePixelRatio, end = songEnd(), SX = t => t / end * W;
   sg.fillStyle = '#17151f'; sg.fillRect(0, 0, W, H);
-  if (mini) sg.drawImage(mini, 0, 0);
+  if (mini && mini.width && mini.height) sg.drawImage(mini, 0, 0);      // 0×0 while the page is hidden or not laid out yet
   doc.lines.forEach((l, k) => {          // where each line is: green = confirmed, grey = estimated, pink = current line
     const [a, b] = lineRange(k);
     sg.fillStyle = k === li ? '#ff7aa8' : l.status === ST_OK ? 'rgba(95,211,154,.85)' : 'rgba(154,148,173,.55)';
@@ -820,7 +851,7 @@ function hitMarker(px) {
 }
 cv.addEventListener('mousedown', e => {
   const px = e.offsetX * devicePixelRatio, k = hitMarker(px);
-  if (k >= 0) { cur = k; snapshot(); drag = { k }; render(); return; }
+  if (k >= 0) { const l = L(); cur = k; snapshot(); drag = { k, ts: resolved(l), end: l.end, tied: l.rows.map(r => r.tied), moved: false }; render(); return; }
   pan = { x: e.clientX, px, t0: view.t0, moved: false };      // empty spot: drag = scroll sideways, release without moving = play from there
 });
 addEventListener('mousemove', e => {
@@ -833,12 +864,30 @@ addEventListener('mousemove', e => {
     return;
   }
   if (!drag) return;
-  const r = cv.getBoundingClientRect(), t = Math.round(T((e.clientX - r.left) * devicePixelRatio) * 100) / 100, l = L();
-  if (drag.k >= l.rows.length) l.end = t; else { l.rows[drag.k].t = t; l.rows[drag.k].tied = false; }
+  // Dragging a mora (or the line end): nothing else moves until it reaches another mora; from then on it pushes the morae it meets ahead of it,
+  // each kept GAP from the one it is pushed by. Morae it hasn't reached stay where they are. It can't push anything past the line end, nor
+  // (unless it is the first mora) before the first mora; tied morae follow by interpolation. Times are always computed from where they were
+  // when the drag started, so dragging back and forth puts back what it pushed
+  const r = cv.getBoundingClientRect(), l = L(), n = l.rows.length, k = drag.k, P = [...drag.ts, drag.end], GAP = .02;
+  const timed = (a, b) => drag.tied.slice(a, b).filter(x => !x).length;      // untied morae among rows a..b-1
+  let t = r2(T((e.clientX - r.left) * devicePixelRatio));
+  if (k < n) t = Math.min(t, r2(P[n] - GAP * (timed(k + 1, n) + 1)));
+  t = k > 0 ? Math.max(t, r2(P[0] + GAP * (timed(1, k) + 1))) : Math.max(t, 0);
+  drag.moved = true;
+  const pos = P.slice();
+  pos[k] = t;
+  for (let j = k + 1, prev = t; j < n; j++) if (!drag.tied[j]) prev = pos[j] = Math.max(P[j], prev + GAP);      // pushed later
+  for (let j = k - 1, prev = t; j > 0; j--) if (!drag.tied[j]) prev = pos[j] = Math.min(P[j], prev - GAP);      // pushed earlier
+  l.rows.forEach((row, j) => { if (j === k) Object.assign(row, { t, tied: false }); else if (!drag.tied[j]) row.t = r2(pos[j]); });
+  l.end = r2(pos[n]);
   render();
 });
 addEventListener('mouseup', () => {
-  if (drag) { drag = null; changed(); }
+  if (drag) {
+    const d = drag; drag = null; changed();
+    const note = d.moved && (d.k === 0 || d.k >= L().rows.length) ? overlapNote(li) : '';      // the line's start or end moved
+    if (note) toast(tr('Note: {0}', note));
+  }
   if (pan) { const p = pan; pan = null; cv.classList.remove('panning'); if (!p.moved) play(T(p.px)); }
   if (sdrag) { sdrag = null; sc.classList.remove('panning'); }
 });
@@ -946,7 +995,7 @@ $('#edCells').addEventListener('click', e => {
     let i = j; while (i > 0 && ed.cells[i - 1].k === 'c' && ed.cells[i - 1].join) i--;
     ed.cells[i].r = (ed.cells[i].r || '') + (nx.r || ''); nx.r = ''; ed.cells[j].join = true;
   } else if (b.dataset.split != null) {      // split: the reading stays on the first character; the ones after it have to be filled in again
-    let i = +b.dataset.split; while (ed.cells[i].join) { ed.cells[i].join = false; i++; if (ed.cells[i].k === 'c' && isKana(ed.cells[i].ch)) ed.cells[i].r = ed.cells[i].ch; }
+    let i = +b.dataset.split; while (ed.cells[i].join) { ed.cells[i].join = false; i++; if (ed.cells[i].k === 'c') ed.cells[i].r = defaultReading(ed.cells[i].ch); }
   }
   renderCells(); renderEdInfo();
 });
@@ -963,7 +1012,7 @@ addEventListener('beforeunload', e => { if (doc && serialize(doc) !== savedText)
 /* ------------------------------------------------------------ startup */
 (async () => {
   const proj = await (await fetch('/__project', { cache: 'no-store' })).json();
-  MV_URL = `../${proj.current}/index.html`; BAR = proj.bar_offset || 0; LS_DRAFT += ':' + proj.slug;
+  MV_URL = `../${proj.current}/index.html`; BAR = proj.bar_offset || 0; LS_DRAFT += ':' + proj.slug; UNITS = proj.reading_units === 'whole' ? 'whole' : 'kana';
   $('#h1').textContent = `${proj.title} · ${tr('Mora timing')}`; document.title = `${tr('Lyric timing')} · ${proj.title}`;
   const res = await fetch(TIMING_URL, { cache: 'no-store' });
   if (!res.ok) throw new Error(tr('lyrics/timing.txt does not exist yet (run python lyric-tool/lyrics.py to generate it)'));

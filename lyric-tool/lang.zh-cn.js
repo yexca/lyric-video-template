@@ -55,7 +55,7 @@ I18N.add('zh-cn', '简体中文', {
     <kbd>Backspace</kbd> 回到上一拍重打　<kbd>←</kbd><kbd>→</kbd> 选拍　<kbd>,</kbd><kbd>.</kbd> 微调 ±10ms（加 <kbd>Shift</kbd> ±50ms）　<kbd>Q</kbd> 吸附到最近的人声起音　<kbd>?</kbd> 标记不确定<br>
     <kbd>[</kbd><kbd>]</kbd> 本句整体前移 / 后移（秒数在「平移」框里）　<kbd>Shift</kbd>+<kbd>[</kbd><kbd>]</kbd> 全部句子整体前移 / 后移<br>
     <kbd>E</kbd> 改这一句的字和读音（合并、拆开、加一句、删除在「句子」那一行）　<kbd>Enter</kbd> 确认本句并到下一句　<kbd>↑</kbd><kbd>↓</kbd> 换句　<kbd>1</kbd>–<kbd>4</kbd> 速度 0.5/0.6/0.75/1　<kbd>V</kbd> 人声 / 原曲　<kbd>Ctrl+Z</kbd> 撤销　<kbd>Ctrl+S</kbd> 保存　<kbd>P</kbd> 在 MV 里看这一句<br>
-    波形：点空白处从那里播放；拖动竖线改时刻；滚轮缩放。细竖线 = 16 分音符，亮线 = 拍，粗线 = 小节。下方的短竖线是人声起音强度。<br>
+    波形：点空白处从那里播放；拖动竖线改时刻——其他竖线不动，碰到别的竖线时就紧贴着把它推着走；滚轮缩放。细竖线 = 16 分音符，亮线 = 拍，粗线 = 小节。下方的短竖线是人声起音强度。<br>
     横向滚动：拖波形下面那条全曲缩略条里的亮框（点框外面，框就挪过去）；或者按住波形的空白处左右拖；或者横向滚轮 / <kbd>Shift</kbd>+滚轮；<kbd>Shift</kbd>+<kbd>←</kbd><kbd>→</kbd> 滚半屏。播放线走出画面右边时会自动翻页。缩略条底下的小条是各句的位置（绿 = 已确认，粉 = 当前句）。`,
   calib: `
     <b>延迟校准</b><br>
@@ -77,6 +77,7 @@ I18N.add('zh-cn', '简体中文', {
   'Line {0} moved {1} s earlier': '第 {0} 句整体前移 {1} 秒',
   'Line {0} moved {1} s later': '第 {0} 句整体后移 {1} 秒',
   '　Note: {0}': '　注意：{0}',
+  'Note: {0}': '注意：{0}',
   'Move all {0} lines {1} s earlier? (Ctrl+Z undoes it)': '把全部 {0} 句整体前移 {1} 秒？（可以 Ctrl+Z 撤销）',
   'Move all {0} lines {1} s later? (Ctrl+Z undoes it)': '把全部 {0} 句整体后移 {1} 秒？（可以 Ctrl+Z 撤销）',
   'All {0} lines moved {1} s earlier. Takes effect once saved (Ctrl+S)': '全部 {0} 句已整体前移 {1} 秒。保存后生效（Ctrl+S）',
@@ -87,15 +88,17 @@ I18N.add('zh-cn', '简体中文', {
   'Edit text and readings · line {0}': '改句子和读音 · 第 {0} 句',
   'Add a line after line {0}': '在第 {0} 句后面加一句',
   'Text (just type; a space = phrase break — phrases can be laid out separately on screen)': '句子（直接打字；空格 = 短句分界，各短句在画面里可以分开排）',
-  'Readings (kana under each kanji; kana themselves rarely need touching. When two or more characters share one reading — 今日 read きょう — click “join” to connect them)':
-    '读音（汉字下面填假名；假名一般不用动。两个以上的字共用一个读音——比如「今日」读「きょう」——点「并」连起来）',
+  'Readings (kana under each kanji: one tap per kana; kana themselves rarely need touching. Any other reading — pinyin, a Latin syllable — is one tap; a space inside a reading splits it into several. When two or more characters share one reading — 今日 read きょう — click “join” to connect them)':
+    '读音（汉字下面填假名，一个假名打一拍；假名本身一般不用动。别的读音——拼音、一个英文音节——算一拍；读音里打空格就拆成几拍。两个以上的字共用一个读音——比如「今日」读「きょう」——点「并」连起来）',
+  'Readings (one under each character: pinyin, kana, the character itself — any text. A whole reading is one tap; type a space inside it to split it into several taps (hello → hel lo). When two or more characters share one reading, click “join” to connect them)':
+    '读音（每个字下面一个：拼音、假名、字本身，什么都可以。一个读音整体算一拍；在读音里打空格就拆成几拍（hello → hel lo）。两个以上的字共用一个读音时点「并」连起来）',
   'Share one reading with the character to the right': '和右边的字共用一个读音',
   'join': '并',
   'Back to one reading per character': '拆回一个字一个读音',
   'split': '拆',
   'Type the text above first': '先在上面输入句子',
   'The line is empty': '句子是空的',
-  '{0} reading{0:|s} still missing or not kana: {1}': '还有 {0} 处读音没填，或者不是假名：{1}',
+  '{0} reading{0:|s} still missing or not usable: {1}': '还有 {0} 处读音没填，或者不能用（不能含 [ ] { }，也不能只有一个 .）：{1}',
   'A line can\'t start with a small kana, a sokuon (っ) or a long-vowel mark (ー)': '句子不能以小写假名、促音或长音开头',
   '{0} {0:mora|morae}': '{0} 拍',
   ' (was {0}): ': '（原来 {0} 拍）：',

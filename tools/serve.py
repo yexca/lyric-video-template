@@ -208,7 +208,8 @@ class Handler(SimpleHTTPRequestHandler):
     def _project(self):
         cfg = config()
         return {'title': cfg.get('title', ''), 'slug': cfg.get('slug', ''), 'current': cfg.get('current', 'template'),
-                'versions': versions(), 'bar_offset': cfg.get('bar_offset', 0), 'thumbs': list(THUMB_W)}
+                'versions': versions(), 'bar_offset': cfg.get('bar_offset', 0),
+                'reading_units': cfg.get('reading_units', 'kana'), 'thumbs': list(THUMB_W)}
 
     def _thumb(self, q):
         """Point self.path at the thumbnail (or at the original, if one can't be made); it is then served like any ordinary file. Returns False for a bad path."""

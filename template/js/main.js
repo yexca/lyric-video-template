@@ -31,7 +31,7 @@ function drawSeg(g, s, t) {
  *   shutter shutter slats                                             blink  two bars close in from top and bottom, then open (col = the bars' colour)
  *   zoom    cross-fade + new shot settles back from slightly larger   fade  cross-fade (col = a wash of colour that rises midway; optional)
  *   punch   hard cut; the new shot drops back from slightly larger (z, default 1.06) while col washes in around the edges of the picture (the middle stays clear)
- *   flash   hard cut; col covers the whole screen, then fades away — a full-screen flash is harsh, so use it once or twice in a song at most; for "the moment it lands", try punch / heart first
+ *   flash   hard cut; col covers the whole screen, then fades away
  */
 const TD = { cut: 0, flash: .35, iris: .5, heart: .55, plus: .55, wipe: .38, pill: .5, push: .32, shutter: .42, blink: .44, zoom: .3, fade: .6, punch: .32 };
 const SHAPES = {
@@ -45,7 +45,7 @@ const SHAPES = {
 function transition(g, s, prev, t) {
   const td = s.td ?? TD[s.cut || 'cut'], dt = t - s.t;
   if (!prev || dt >= td || !td) { drawSeg(g, s, t); return s.cut === 'flash' && dt < td ? ['flash', 1 - dt / td] : null; }
-  const k = E.inOut(clamp(dt / td)), col = s.col || C.cream;
+  const k = E.inOut(clamp(dt / td)), col = s.col || C.mid;
   switch (s.cut) {
     case 'flash': drawSeg(g, s, t); return ['flash', 1 - dt / td];
     case 'iris': {
@@ -78,12 +78,12 @@ function transition(g, s, prev, t) {
       const x = lerp(-520, W + 520, k), sl = 300, wd = 150, len = 1700, a = Math.atan2(sl * 2, H + 20);
       g.save(); g.beginPath(); g.moveTo(-10, -10); g.lineTo(x + sl, -10); g.lineTo(x - sl, H + 10); g.lineTo(-10, H + 10); g.closePath(); g.clip(); drawSeg(g, s, t); g.restore();
       g.save(); g.translate(x, H / 2); g.rotate(a);
-      g.fillStyle = 'rgba(40,40,80,.16)'; g.beginPath(); g.roundRect(-wd / 2 + 16, -len / 2 + 10, wd, len, wd / 2); g.fill();
+      g.fillStyle = 'rgba(0,0,0,.16)'; g.beginPath(); g.roundRect(-wd / 2 + 16, -len / 2 + 10, wd, len, wd / 2); g.fill();
       g.save(); g.beginPath(); g.roundRect(-wd / 2, -len / 2, wd, len, wd / 2); g.clip();
       g.fillStyle = '#ffffff'; g.fillRect(-wd, -len, wd * 2, len * 2); g.fillStyle = col; g.fillRect(-wd, -len, wd * 2, len);
       g.fillStyle = 'rgba(255,255,255,.4)'; g.beginPath(); g.roundRect(-wd * .3, -len / 2 + 60, wd * .16, len - 120, wd * .08); g.fill();
       g.restore();
-      g.lineWidth = 8; g.strokeStyle = C.ink || '#2a2f5b'; g.beginPath(); g.roundRect(-wd / 2, -len / 2, wd, len, wd / 2); g.stroke();
+      g.lineWidth = 8; g.strokeStyle = C.fg; g.beginPath(); g.roundRect(-wd / 2, -len / 2, wd, len, wd / 2); g.stroke();
       g.restore();
       return null;
     }
@@ -151,7 +151,6 @@ function render(t) {
   const fl = transition(c, s, prev, t);
   c.restore();
   if (fl && fl[0] === 'flash') { c.save(); c.globalAlpha = fl[1] ** 2; c.fillStyle = s.col || '#ffffff'; c.fillRect(0, 0, W, H); c.restore(); }
-  grain(c, t, .07);
   if (debug) {
     c.save(); c.fillStyle = 'rgba(0,0,0,.6)'; c.fillRect(0, 0, 620, 40);
     c.font = '20px monospace'; c.fillStyle = '#ff0'; c.textBaseline = 'middle';

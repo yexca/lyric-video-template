@@ -8,6 +8,7 @@
   "lrc_offset": 0,
   "bpm_range": [70, 200],
   "bar_offset": 0,
+  "reading_units": "kana",
   "export_dir": "data/export",
   "tmp_dir": "data/tmp"
 }

@@ -63,6 +63,7 @@ Edit [project.json](../project.json):
 | `lrc_offset` | How many seconds the LRC timestamps are ahead of the audio (positive = LRC is early) |
 | `bpm_range` | Search range for the BPM. Detection easily lands on half or double tempo; narrow the range if you know the rough tempo |
 | `bar_offset` | Which beat the bar's downbeat falls on (0–3); the timing tool uses it to draw bar lines |
+| `reading_units` | How a reading is cut into taps. `kana` (default, Japanese): one tap per kana; a reading that isn't kana (pinyin, a Latin syllable) is one tap. `whole` (e.g. Chinese lyrics): every reading is one tap as it is. In both, a space inside a reading splits it into several taps (`hel lo`) |
 | `export_dir` `tmp_dir` | Where finished videos and headless Chrome's temporary profiles go. Both default to inside the workspace (`data/export`, `data/tmp`): **no data leaves the workspace**, so normally leave them alone. If they really must live elsewhere, put that in `project.local.json` (machine-specific, not in git; same keys override) |
 
 ### 1. Add your material
@@ -102,12 +103,15 @@ python tools/serve.py
 ```
 
 The lines themselves are edited in the timing tool too: "Edit text / readings" opens a furigana-style editor
-(kana under each kanji), and a line can be split in two, merged with the next one, added or deleted.
+(a reading under each character: kana, pinyin, any text; see `reading_units` above for how readings become taps), and
+a line can be split in two, merged with the next one, added or deleted. On the waveform, dragging a mora's line moves
+nothing else until it reaches another line; from then on it pushes that line along ahead of it.
 Saving updates `timing.txt`, `kana.txt` and the `lyrics.js` the versions use, all together.
 **When the number of lines changes, line numbers change**: everything in the storyboard that refers to a line by
 number (`LT(n)`, `li: n`) has to follow — the tool lists which numbers changed when you save.
 
-A "mora" here is the unit you tap: one kana (small kana, っ and ー join the mora before them). The file format and
+A "mora" here is the unit you tap: one kana (small kana, っ and ー join the mora before them), or one whole reading
+with `reading_units: "whole"`. The file format and
 all commands are described at the top of [lyric-tool/lyrics.py](../lyric-tool/lyrics.py). In the timeline
 file a line's status is `estimated` or `confirmed`; the file always uses those two words, whatever language the tool
 is shown in.
@@ -125,19 +129,11 @@ The content is written in `v1_1/js/scenes.js` (the storyboard). How the engine w
 
 ### 5. Images
 
-You can draw or find the images yourself, or have a coding assistant call an image-generation service.
-For the latter the assistant asks you a few things first (it does not assume them):
-
-- which service to use and how to connect to it (never put credentials in the repository);
-- whether each image should get several candidates to choose from, and how many — more candidates make a good pick
-  likelier, and multiply cost and time;
-- which reference images define the subject. When the references are incomplete (a single angle, things in the way),
-  add one from a standard angle with nothing hidden, or have the assistant prepare the material and make a standard
-  design sheet yourself: parts that can't be seen, and anything asymmetrical, are easy to get wrong — and the mistake
-  then shows up in every single image.
-
-The generation script is written per project (the template has none, see the last section); what it must do is in the
-"Image generation" section of [AGENTS.md](../AGENTS.md).
+How the images are made is up to you: draw them, use your own material, have a coding assistant call a generation
+service, or mix these. The template prescribes no service, style or way of choosing. If a service is used, the
+assistant asks you which one, how to connect, and how many candidates you want, rather than assuming; the script is
+written per project (the template has none, see the last section), and the bookkeeping it must do is in "Making
+images" in [AGENTS.md](../AGENTS.md).
 
 Candidates go in `data/candidates/<key>/` and are viewed at <http://127.0.0.1:8600/pic-tool/>. A chosen one is added
 to the image pool and given a number:
@@ -263,12 +259,15 @@ or the interpreter's full path instead.
 
 ## What the template leaves out
 
-- **The image-generation script**: it is tied too closely to a particular service and its prompts, so the template
-  presets no service, address or candidate count — you tell the assistant all of that. Only the landing place is fixed
-  (candidates to `data/candidates/<key>/`, the chosen one added with `pic.py add`) along with a few things the script
-  must do (resumable, check lengths before submitting, round-robin one image per key, speak up while waiting … see
-  "Image generation" in [AGENTS.md](../AGENTS.md)).
+- **A visual style or a way of making the picture**: the template is project management — where files go, how
+  versions and images are tracked, how work is checked and exported. What the video looks like is each work's own
+  decision. The engine's graphic helpers, transitions and demo storyboard show what it can do; use, replace or ignore
+  them.
+- **The image-generation script**: it is tied too closely to a particular service, so the template presets no
+  service, prompt, address or candidate count — you tell the assistant all of that. Only the landing place is fixed
+  (candidates to `data/candidates/<key>/`, the chosen one added with `pic.py add`) along with a little bookkeeping
+  (resumable, speaks up while waiting … see "Making images" in [AGENTS.md](../AGENTS.md)).
 - **Release material** (cover, description, subtitles): different for every work; create a `release/` folder at the
   root when you need it.
-- **Lyrics in languages other than Japanese**: the rules for splitting into morae are written for kana. For another
-  language you can mark each syllable in `kana.txt` as one "mora", but this has not been tried.
+- **Lyrics in languages other than Japanese**: set `reading_units` to `whole` in `project.json`; then each character
+  (or word) is one tap, its reading can be anything (pinyin, the character itself), and a space in a reading splits it.

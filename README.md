@@ -10,6 +10,9 @@ This is an empty template: it contains no songs and no images. Copy the folder (
 to start a new work. It is meant to be driven together with a coding assistant — [AGENTS.md](AGENTS.md) holds the
 working conventions the assistant follows.
 
+The template organises the work — where files go, how versions and images are tracked, how the result is checked
+and exported. It does not prescribe a visual style or how images are made; that is up to each work.
+
 ## What's inside
 
 - **Engine** (`template/`) — canvas scenes keyed to the lyrics and the beat, transitions, a player, a frame-export interface.

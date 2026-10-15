@@ -65,8 +65,25 @@ MERGE = SMALL | set('っッー')
 OPEN = set('「『（(')
 CLOSE = set('」』）)？！、。?!')
 ST_EST, ST_OK = 'estimated', 'confirmed'
+UNITS = 'whole' if config().get('reading_units') == 'whole' else 'kana'
+KANA_CH = re.compile(r'^[ぁ-ゖァ-ヺー]+$')
 
 # ---------------------------------------------------------------- readings → morae
+
+
+def units_of(read):
+    """A reading → its units (one unit = one mora = one tap). A space always splits a reading; each piece is then
+    reading_units "kana" (Japanese, the default): split again per kana if it is all kana (small kana, っ and ー merge back in morae_of); any other piece (pinyin, a Latin syllable) is one unit
+    reading_units "whole": one unit as it is — a character's reading is not split unless a space is typed into it
+    (unitsOf in the timing tool implements the same rules; change the two together.)"""
+    return [u for p in read.split() for u in (list(p) if UNITS == 'kana' and KANA_CH.match(p) else [p])]
+
+
+def join_units(a, b):
+    """Inverse of units_of: append unit b to reading a (kana run straight on when they split per kana anyway; anything else is kept apart by a space)"""
+    if not a:
+        return b
+    return a + b if UNITS == 'kana' and KANA_CH.match(a.split(' ')[-1]) and KANA_CH.match(b) else a + ' ' + b
 
 
 def parse_kana_line(s):
@@ -103,7 +120,7 @@ def morae_of(s):
             else:
                 phrases[-1][-1]['disp'] += disp
             continue
-        for j, k in enumerate(read):
+        for j, k in enumerate(units_of(read)):
             phrases[-1].append({'disp': (pending + disp) if j == 0 else '', 'kana': k})
             if j == 0:
                 pending = ''
@@ -146,7 +163,7 @@ def tokens_of(rows):
             head, d = head + d[0], d[1:]
         while d and d[-1] in CLOSE:
             tail, d = d[-1] + tail, d[:-1]
-        while len(k) > 1 and d and d[-1] in MERGE and d[-1] == k[-1]:      # small kana / sokuon / long-vowel mark merged into this mora: each is a character of its own
+        while KANA_CH.match(k) and len(k) > 1 and d and d[-1] in MERGE and d[-1] == k[-1]:      # small kana / sokuon / long-vowel mark merged into this mora: each is a character of its own
             merged.insert(0, d[-1])
             d, k = d[:-1], k[:-1]
         toks += [(c, '') for c in head]
@@ -156,7 +173,7 @@ def tokens_of(rows):
             last = next((t for t in reversed(toks) if isinstance(t, list)), None)
             if last is None:
                 raise SystemExit(f"The first mora of a line in the timeline has no displayed character (reading {r['kana']})")
-            last[1] += k
+            last[1] = join_units(last[1], k)
         toks += [[c, c] for c in merged] + [(c, '') for c in tail]
     return toks
 
@@ -167,7 +184,7 @@ def kana_notation(rows):
     for t in tokens_of(rows):
         if t is None:
             out += ' '
-        elif not t[1] or t[0] == t[1]:
+        elif not t[1] or (t[0] == t[1] and (len(t[0]) == 1 or KANA_CH.match(t[0]))):      # a word read as itself still needs [word]{word}, or it would split per letter
             out += t[0]
         else:
             out += f'{t[0]}{{{t[1]}}}' if len(t[0]) == 1 else f'[{t[0]}]{{{t[1]}}}'
@@ -686,7 +703,10 @@ def embedded_lyrics():
 KANA_HEADER = """# Lyric readings (lyric-tool/lyrics.py uses this at the first estimate to split each line into morae)
 #   漢字{よみ}: the reading goes right after a single kanji; when two or more characters share one reading, write [身体]{からだ}
 #   a space = a phrase boundary (as in the original lyrics)
-#   splitting into morae: one kana per mora; the small ゃゅょぁぃぅぇぉ, the sokuon っ and the long-vowel mark ー merge into the previous mora
+#   splitting into morae (reading_units "kana", the default): one kana per mora; the small ゃゅょぁぃぅぇぉ, the sokuon っ and the long-vowel mark ー merge into the previous mora;
+#     a reading that isn't kana (pinyin, a Latin syllable: 字{zi}) is one mora; a space inside {} splits a reading: [hello]{hel lo}
+#   reading_units "whole" in project.json: every reading is one mora as it is (空{そら} is one mora too); only a space inside {} splits it
+#   a character with no {} reads as itself
 #   the number at the start of each row is the line number (the same order as the original lyrics; for cross-reference only)
 # Once a timeline (timing.txt) exists, lines and readings are changed in the timing tool and this file is rewritten on save — do not edit it by hand any more.
 """

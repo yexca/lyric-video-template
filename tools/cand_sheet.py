@@ -4,7 +4,7 @@
     python tools/cand_sheet.py hero bg      # the given keys
     python tools/cand_sheet.py --zoom hero/01 0.1 0.2 0.5 0.6   # zoom in on one region (x0 y0 x1 y1, 0..1) → data/checks/zoom.jpg
     python tools/cand_sheet.py --zoom hero/01 .1 .2 .5 .6 hero/02 .1 .2 .5 .6 bg/03 .3 .5 .7 .8
-                                                                # zoom in on several regions at once, tiled into one image (when picking, line up the spots each candidate tends to get wrong)
+                                                                # zoom in on several regions at once, tiled into one image (compare chosen regions side by side)
     python tools/cand_sheet.py --zoom hero/01 hero/02 hero/03 --box .1 .2 .5 .6   # the same region of several images
     python tools/cand_sheet.py --zoom img/hero.r2.png .1 .2 .5 .6                 # an image in the image pool (data/img/), for self-review of images already in use
     python tools/cand_sheet.py --zoom … --out detail                              # save as data/checks/detail.jpg (default: zoom.jpg)

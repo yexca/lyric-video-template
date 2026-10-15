@@ -1,5 +1,5 @@
 'use strict';
-/* Graphic elements: all flat shapes (screen-print / poster style), with no dependence on images. */
+/* Graphic helpers: flat shapes drawn in code, with no dependence on images. Optional — a work may use, change or ignore them. */
 
 /* ---------- Backgrounds ---------- */
 // The screen's bounding rectangle in user coordinates under the current transform (backgrounds fill only the visible part)
@@ -15,10 +15,6 @@ function vgrad(c, stops, y0 = 0, y1 = H) {
   const g = c.createLinearGradient(0, y0, 0, y1);
   stops.forEach((s, i) => g.addColorStop(Array.isArray(s) ? s[0] : i / (stops.length - 1), Array.isArray(s) ? s[1] : s));
   c.fillStyle = g; c.fillRect(...screenRect(c));
-}
-function paper(c, a = 1) {
-  c.save(); c.globalAlpha = a;
-  c.drawImage(TEX.paper || PAPER, 0, 0, W, H); c.restore();
 }
 // Halftone gradient: the dots grow from r0 to r1 (along ang). The parameters don't change, so each set is cached as a half-resolution bitmap (redrawing thousands of dots every frame is too slow)
 const _ht = new Map();

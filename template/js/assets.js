@@ -7,9 +7,7 @@
  */
 const IMG = {
   // key: { fx, fy focus point (0..1), face: [x, y, zoom] face close-up, placeholder: true = has no image by design (for examples; not counted as missing at export) }
-  demo_a: { fx: .5, fy: .45, placeholder: true },
-  demo_b: { fx: .5, fy: .45, placeholder: true },
-  demo_c: { fx: .5, fy: .45, face: [.5, .3, 2], placeholder: true },
+  demo: { fx: .5, fy: .5, placeholder: true },
 };
 const IMG_DIR = '../data/img/';
 
@@ -98,17 +96,16 @@ function drawCover(c, key, x, y, w, h, o = {}) {
   c.drawImage(o.duo ? src : pick(m, sw * s, c), dx, dy, sw * s, sh * s);
 }
 
-// Placeholder: gradient + halftone dots + number (the key name while there is no number yet). Drawn w×h, centred on (0,0)
+// Placeholder: a plain grey box with a cross, the number (the key name while there is no number yet) and the key. Drawn w×h, centred on (0,0)
 function placeholder(c, key, w, h, o = {}) {
-  const m = IMG[key] || {}, seed = [...key].reduce((a, ch) => a + ch.charCodeAt(0), 0);      // colour fixed by the key name
-  const col = o.col || [C.blue, C.magenta, C.amber, C.violet, C.red][seed % 5];
-  const g = c.createLinearGradient(0, -h / 2, 0, h / 2);
-  g.addColorStop(0, mix(col, C.white, .7)); g.addColorStop(1, col);
-  c.fillStyle = g; c.fillRect(-w / 2, -h / 2, w, h);
-  c.fillStyle = dotPattern(c, rgba(C.ink, .16), 16, 2.4); c.fillRect(-w / 2, -h / 2, w, h);
-  const s = Math.min(w, h);
-  txt(c, m.no != null ? '#' + m.no : key, 0, -s * .03, { f: 'goth', w: 900, size: m.no != null ? s * .26 : Math.min(s * .13, w * 1.5 / Math.max(4, key.length)), color: rgba(C.ink, .6), backdrop: true });
-  txt(c, m.no != null ? key : 'no image', 0, s * .2, { f: 'goth', w: 500, size: s * .06, color: rgba(C.ink, .45), backdrop: true });
+  const m = IMG[key] || {}, s = Math.min(w, h);
+  c.fillStyle = o.col || C.light; c.fillRect(-w / 2, -h / 2, w, h);
+  c.save(); c.strokeStyle = C.mid; c.lineWidth = 2;
+  c.beginPath(); c.moveTo(-w / 2, -h / 2); c.lineTo(w / 2, h / 2); c.moveTo(w / 2, -h / 2); c.lineTo(-w / 2, h / 2); c.stroke();
+  c.lineWidth = 4; c.strokeRect(-w / 2 + 2, -h / 2 + 2, w - 4, h - 4); c.restore();
+  c.fillStyle = o.col || C.light; c.fillRect(-s * .36, -s * .17, s * .72, s * .46);      // a clear patch behind the text
+  txt(c, m.no != null ? '#' + m.no : key, 0, -s * .03, { f: 'goth', w: 700, size: m.no != null ? s * .2 : Math.min(s * .11, w * 1.2 / Math.max(4, key.length)), color: C.dark });
+  txt(c, m.no != null ? key : 'no image', 0, s * .17, { f: 'goth', w: 500, size: s * .06, color: C.mid });
 }
 
 /* Card: shape = rect | round | circle | heart | tear | para (slanted sides) | polaroid
@@ -136,7 +133,7 @@ function card(c, key, x, y, w, h, o = {}) {
     c.save(); c.translate(o.shx ?? 14, (o.shy ?? 14) + fy); c.fillStyle = o.shadow;
     cardPath(c, pol ? 'rect' : shape, fw, fh, o); c.fill(); c.restore();
   }
-  if (bw) { c.save(); c.translate(0, fy); c.fillStyle = o.bcol || C.cream; cardPath(c, pol ? 'rect' : shape, fw, fh, o); c.fill(); c.restore(); }
+  if (bw) { c.save(); c.translate(0, fy); c.fillStyle = o.bcol || C.white; cardPath(c, pol ? 'rect' : shape, fw, fh, o); c.fill(); c.restore(); }
   // Image
   c.save();
   cardPath(c, pol ? 'rect' : shape, iw, ih, o); c.clip();
@@ -149,6 +146,6 @@ function card(c, key, x, y, w, h, o = {}) {
   if (o.dots) { c.globalAlpha = o.dots; c.fillStyle = dotPattern(c, o.dotCol || '#ffffff', 10, 1.6); c.fillRect(-iw / 2, -ih / 2, iw, ih); }
   c.restore();
   if (o.line) { c.lineWidth = o.lw || 4; c.strokeStyle = o.line; cardPath(c, pol ? 'rect' : shape, iw, ih, o); c.stroke(); }
-  if (pol && o.label) txt(c, o.label, 0, ih / 2 + bw + h * .1, { f: 'goth', size: Math.max(16, h * .075), color: C.ink, w: 700 });
+  if (pol && o.label) txt(c, o.label, 0, ih / 2 + bw + h * .1, { f: 'goth', size: Math.max(16, h * .075), color: C.fg, w: 700 });
   c.restore();
 }

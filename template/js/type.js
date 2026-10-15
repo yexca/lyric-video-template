@@ -76,7 +76,7 @@ function layout(c, cfg) {
       let cur = p.align === 'left' || p.align === 'top' ? 0 : p.align === 'right' || p.align === 'bottom' ? -len : -len / 2;
       for (const i of run) {
         const s = size * (em(chars[i]).s || 1), ch = chars[i];
-        const g = { ch, part, pi, i, n: chars.length, f: em(ch).f || f, w: em(ch).w, size: s, col: em(ch).col || p.color || C.ink,
+        const g = { ch, part, pi, i, n: chars.length, f: em(ch).f || f, w: em(ch).w, size: s, col: em(ch).col || p.color || C.fg,
           q: dir === 'h' ? cur + ws[i] / 2 : cur + ws[i] / 2, r, rot: 0, ox: 0, oy: 0, p };
         if (dir === 'v') {
           if (VROT.includes(ch)) g.rot = Math.PI / 2;
