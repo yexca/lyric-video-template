@@ -140,8 +140,8 @@ function render(t) {
   const i = segAt(t), s = SEG[i], prev = SEG[i - 1];
   c.setTransform(RS, 0, 0, RS, 0, 0); c.globalAlpha = 1; c.globalCompositeOperation = 'source-over'; c.filter = 'none'; c.imageSmoothingQuality = 'high';
   c.fillStyle = '#000'; c.fillRect(0, 0, W, H);
-  // Drum hit impact: a slight zoom + shake
-  const kick = AU.kick(t) * (s.shake ?? 1);
+  // Drum hit impact: a slight zoom + shake. Off unless a shot sets shake (a motion choice for the work, asked of the user)
+  const kick = AU.kick(t) * (s.shake ?? 0);
   c.save();
   if (kick > .02) {
     const f = Math.floor(t * 30);

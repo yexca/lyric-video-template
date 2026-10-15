@@ -15,11 +15,11 @@
  *   draw(c, t, s)   draws the shot as it looks at time t. It may depend only on t — keep no state from the previous frame
  *   lyr    the lyrics / text in this shot (the lyric config in js/type.js): li = which line of the lyrics, or text = your own text
  *   over(c, t, s)   drawn on top of the lyrics
- *   shake  strength of the shake on drum hits (default 1, 0 = none)
+ *   shake  strength of a slight zoom + shake on drum hits (default 0 = none; 1 = normal)
  * Write times in terms of the lyrics and the beat rather than hard-coded seconds — when the timeline is corrected, the picture follows:
  *   LT(line, phrase) start of singing   LE singing ends   LL whole line over   LCT(line, nth character, phrase) that character is sung   BT(n) the nth beat
  *   LCUT(line) the nearest beat before the line starts (where the shot cuts)   CUT(t) the nearest beat before t   DOWN(t) the next bar line after t
- * Handy helpers: pop(t, t0, d) pop-in scale (0 → 1)   typeOn(c, text, x, y, t, t0, step, o) your own text popping in character by character
+ * Handy helpers: pop(t, t0, d) pop-in scale (0 → 1)   typeOn(c, text, x, y, t, t0, step, o) your own text appearing character by character (o.pop for a pop-in)
  *   CAP(line, o) lays a line of lyrics out as a one-line caption at the bottom and returns a config for lyr
  *   (combine it with your own style: Object.assign({ f, color… }, CAP(3)))
  */
@@ -41,8 +41,8 @@ const SEG = [
     },
     lyr: [
       LYR.length
-        ? { li: 0, y: H / 2, size: 96, f: 'goth', color: C.fg, anim: 'type', out: 'fade', bounce: 0 }
-        : { text: ['Each character appears', 'at the moment it is sung'], t0: [1, 4], step: .08, y: H / 2, size: 96, f: 'goth', color: C.fg, anim: 'type', tOut: T2 - .5, out: 'fade', always: true, bounce: 0 },
+        ? { li: 0, y: H / 2, size: 96, f: 'goth', color: C.fg, out: 'fade' }
+        : { text: ['Each character appears', 'at the moment it is sung'], t0: [1, 4], step: .08, y: H / 2, size: 96, f: 'goth', color: C.fg, tOut: T2 - .5, out: 'fade', always: true },
     ],
   },
   {
@@ -51,6 +51,6 @@ const SEG = [
       fill(c, C.bg);
       card(c, 'demo', W / 2, H / 2 - 50, 720, 720 * 9 / 16);    // key 'demo' has no image, so the numbered placeholder is drawn
     },
-    lyr: [{ text: 'Images are referred to by key; images.json maps keys to files', t0: T2 + .5, step: .03, y: H - 150, size: 40, f: 'goth', color: C.dark, anim: 'type', tOut: T2 + 11.5, out: 'fade', always: true, bounce: 0 }],
+    lyr: [{ text: 'Images are referred to by key; images.json maps keys to files', t0: T2 + .5, step: .03, y: H - 150, size: 40, f: 'goth', color: C.dark, tOut: T2 + 11.5, out: 'fade', always: true }],
   },
 ];

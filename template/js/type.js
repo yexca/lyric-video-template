@@ -11,11 +11,11 @@
  *   color, sh   text colour, flat drop shadow colour (a misregistered-print look); stroke / sw for a stroke
  *   hl          colour of the character being sung (fades back to color once sung)
  *   emph        { character: { s (scale), col, f } }
- *   anim        pop | drop | rise | stamp | slide | spin | type
+ *   anim        type (default: the character simply appears) | pop | drop | rise | stamp | slide | spin
  *   out         up | fade | fall | scatter | wipe | cut (the exit, after tOut)
  *   tIn, tOut   display window (default: from .05s before the line starts being sung until just before the next line starts)
  *   max         maximum length of a row / column; anything longer wraps after a particle
- *   bounce      size of the small hop on each beat
+ *   bounce      size of a small hop on each beat (default 0 = none; .03 is a light hop)
  *   fx(g, t, d) custom per-character transform, returns { dx, dy, s, r, a, col }
  */
 let lyricsOn = true;
@@ -133,8 +133,8 @@ function lyric(c, t, cfg) {
   if (!lyricsOn && !cfg.always) return;
   const [t0, t1] = lyricWindow(cfg);
   if (t < t0 - .1 || t > t1 + 1.2) return;
-  const G = layout(c, cfg), anim = cfg.anim || 'pop', out = cfg.out || 'up';
-  const bounce = (cfg.bounce ?? .03) * AU.pulse(t, 1, 0, 12);
+  const G = layout(c, cfg), anim = cfg.anim || 'type', out = cfg.out || 'up';
+  const bounce = (cfg.bounce ?? 0) * AU.pulse(t, 1, 0, 12);
   c.save();
   if (cfg.alpha != null) c.globalAlpha *= cfg.alpha;
   for (const g of G) {
@@ -203,15 +203,15 @@ function CAP(li, o = {}) {
   const pos = ws.map(w => { const p = { x: x + w / 2, y: o.y ?? Math.round(H * .91) }; x += w + gap; return p; });
   return Object.assign({ li, size, pos, max: W, out: 'fade', outDur: .18 }, o);
 }
-// Your own text (not lyrics) popping in one character at a time: one character every step seconds from t0. Call it inside draw(), so it moves together with panels and labels.
-// o: size, f, w (font weight), color, stroke, sw, alpha, ls, align ('left' | 'right', default: centred). The characters used must be listed in EXTRA_TEXT
+// Your own text (not lyrics) appearing one character at a time: one character every step seconds from t0. Call it inside draw(), so it moves together with panels and labels.
+// o: size, f, w (font weight), color, stroke, sw, alpha, ls, align ('left' | 'right', default: centred), pop (true = each character pops in with a scale overshoot; default: it simply appears). The characters used must be listed in EXTRA_TEXT
 function typeOn(c, s, x, y, t, t0, step, o = {}) {
   const chars = Array.from(s), size = o.size || 48, f = o.f || 'goth', w = o.w;
   const ws = chars.map(ch => measure(c, ch, size, f, w) + (o.ls || 0)), total = ws.reduce((a, b) => a + b, 0);
   let cx = o.align === 'left' ? x : o.align === 'right' ? x - total : x - total / 2;
   chars.forEach((ch, i) => {
     const d = t - t0 - i * step;
-    if (d > 0) { const k = E.back(clamp(d / .2)); c.save(); c.translate(cx + ws[i] / 2, y); c.scale(k, k); txt(c, ch, 0, 0, { f, size, w, color: o.color, stroke: o.stroke, sw: o.sw, alpha: o.alpha }); c.restore(); }
+    if (d > 0) { const k = o.pop ? E.back(clamp(d / .2)) : 1; c.save(); c.translate(cx + ws[i] / 2, y); c.scale(k, k); txt(c, ch, 0, 0, { f, size, w, color: o.color, stroke: o.stroke, sw: o.sw, alpha: o.alpha }); c.restore(); }
     cx += ws[i];
   });
 }

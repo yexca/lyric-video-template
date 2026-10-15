@@ -18,7 +18,7 @@
 | `lang.zh-cn.js` | Simplified Chinese for the player's own text (start screen, controls, start-up notes); it has nothing to do with the content |
 | `js/core.js` | Basics: easing, `pop()`, deterministic random, colours, the neutral grey palette `C`, the beat `AU`, lyric times `LT/LE/LL/LCT`, cut points `CUT/DOWN/LCUT`, fonts, `txt()` |
 | `js/fx.js` | Optional graphic helpers: fills and gradients, grain, halftone dots, rings, starfield, rays, speed lines … |
-| `js/type.js` | Kinetic lyrics: `lyric(c, t, cfg)`, each character appearing at the moment it is sung; `CAP()` the config for a one-line caption; `typeOn()` your own text popping in character by character |
+| `js/type.js` | Kinetic lyrics: `lyric(c, t, cfg)`, each character appearing at the moment it is sung; `CAP()` the config for a one-line caption; `typeOn()` your own text appearing character by character |
 | `js/assets.js` | Images: `IMG` holds each image's focus point; `card()` draws a card; when an image is missing, a plain numbered placeholder is drawn instead |
 | `js/scenes.js` | **The storyboard = the content of the video.** Each entry in `SEG` is one shot |
 | `js/main.js` | Compositing, transitions, the player, the export interface `window.MV` |

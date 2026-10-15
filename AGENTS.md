@@ -162,8 +162,13 @@ choosing. It fixes only where things land and how they are tracked:
 
 ## Picture
 
-What the picture looks like is the work's own business. The rules here only keep it reproducible and checkable:
+What the picture looks like is the work's own business. The rules here keep it reproducible and checkable, and leave
+choices of look and motion to the user:
 
+- Motion effects are off by default: no zoom / shake on drum hits (`shake` on a shot), lyrics simply appear with no
+  pop-in (`anim`) and no hop on the beat (`bounce`), and `typeOn()` doesn't pop (`pop`). Whether a work uses any of
+  them is the user's call: ask before turning one on rather than adding it by habit, and record the answer under
+  "Direction" in "This project".
 - The picture depends only on the time `t`: no state kept from the previous frame; randomness via `hash()`. Otherwise
   scrubbing, frame-by-frame export and parallel segmented export give different results.
 - After changing the picture, look at it yourself first: `node tools/frames.cjs --sheet …` for frame grabs,
@@ -264,8 +269,8 @@ In the template this section is empty. Once a work is under way, write here the 
 work, for example:
 
 - Title and theme: one sentence.
-- Direction: whatever the user has said about the look, the references to follow or avoid, and the way the video
-  should feel — in the user's own terms. Nothing here comes from the template.
+- Direction: whatever the user has said about the look, the references to follow or avoid, motion (drum-hit shake,
+  beat hops, pop-ins: on or off), and the way the video should feel — in the user's own terms. Nothing here comes from the template.
 - The subject (characters etc.), if there is one: which reference material defines it; which shots it appears in;
   any exceptions.
 - Making images (all of it learned by asking the user, see "Making images" above): how they are made; if a service is
